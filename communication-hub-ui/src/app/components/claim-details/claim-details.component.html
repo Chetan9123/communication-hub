@@ -1,0 +1,80 @@
+<div class="claim-details">
+  <div class="header">
+    <button class="btn-back" (click)="goBack()">← Back</button>
+    <h1 *ngIf="claimDetails">
+      Claim #{{ claimDetails.claimNumber }} | Policy #{{ claimDetails.policyNumber }}
+    </h1>
+  </div>
+
+  <div *ngIf="isLoading" class="loading">Loading claim details...</div>
+
+  <div *ngIf="!isLoading && claimDetails" class="content">
+    <!-- Claim Header -->
+    <div class="claim-header">
+      <div class="header-info">
+        <div class="info-row">
+          <span class="label">Claim Number:</span>
+          <span class="value">{{ claimDetails.claimNumber }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Policy Number:</span>
+          <span class="value">{{ claimDetails.policyNumber }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Status:</span>
+          <span class="value status" [ngClass]="claimDetails.status.toLowerCase()">
+            {{ claimDetails.status }}
+          </span>
+        </div>
+        <div class="info-row">
+          <span class="label">Filed Date:</span>
+          <span class="value">{{ claimDetails.claimFiledOn | date: 'medium' }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Involved Parties -->
+    <div class="involved-parties-section">
+      <h2>📋 Involved Parties</h2>
+      
+      <!-- Parties Grid -->
+      <div *ngIf="involvedParties && involvedParties.length > 0" class="parties-grid">
+        <div
+          *ngFor="let party of involvedParties"
+          class="party-card"
+          (click)="openCommunicationHub(party)"
+        >
+          <div class="party-icon">{{ getPartyTypeIcon(party.involvedPartyType) }}</div>
+          <div class="party-info">
+            <div class="name">{{ party.fullName }}</div>
+            <div class="type">{{ party.involvedPartyType }}</div>
+            <div class="contact">
+              <div *ngIf="party.email" class="email">📧 {{ party.email }}</div>
+              <div *ngIf="party.phone" class="phone">📱 {{ party.phone }}</div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button class="btn-action email" (click)="openComposeModal(party.partyId, 'Email', $event)" title="Send Email">📧</button>
+            <button class="btn-action sms" (click)="openComposeModal(party.partyId, 'SMS', $event)" title="Send SMS">📱</button>
+            <button class="btn-action whatsapp" (click)="openComposeModal(party.partyId, 'WhatsApp', $event)" title="Send WhatsApp">💬</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- No Parties Message -->
+      <div *ngIf="involvedParties && involvedParties.length === 0" class="no-parties-message">
+        <p>ℹ️ No involved parties found for this claim</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Compose Modal -->
+<app-communication-compose
+  *ngIf="showComposeModal"
+  [claimId]="claimId"
+  [partyId]="composePartyId"
+  [initialMode]="composeInitialMode"
+  (closed)="closeComposeModal()"
+  (sent)="onCommunicationSent()"
+></app-communication-compose>

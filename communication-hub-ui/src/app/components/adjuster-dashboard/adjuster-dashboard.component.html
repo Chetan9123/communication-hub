@@ -1,0 +1,107 @@
+<div class="adjuster-dashboard">
+  <!-- Top Menu -->
+  <div class="top-menu">
+    <button class="btn-communication-hub" (click)="navigateToCommunicationHub()">
+      📋 Communication Hub (To-Do)
+    </button>
+  </div>
+
+  <!-- Dashboard Header -->
+  <div class="dashboard-header">
+    <h1>Dashboard (Assigned Claims)</h1>
+    <div class="adjuster-info" *ngIf="dashboard">
+      <span class="adjuster-name">Adjuster: {{ dashboard.adjusterName }}</span>
+    </div>
+  </div>
+
+  <!-- Search & Filters Section -->
+  <div class="search-filter-section">
+    <div class="search-box">
+      <input
+        type="text"
+        placeholder="Search by Claim Number or Policy Number..."
+        [value]="searchTerm"
+        (input)="onSearchChange($any($event.target).value)"
+        class="search-input"
+      />
+      <span class="search-icon">🔍</span>
+    </div>
+
+    <div class="filter-box">
+      <label for="statusFilter">Search + Filters</label>
+      <select
+        id="statusFilter"
+        [value]="statusFilter"
+        (change)="onStatusFilterChange($any($event.target).value)"
+        class="filter-select"
+      >
+        <option value="">All Status</option>
+        <option *ngFor="let status of statuses" [value]="status">{{ status }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <p>Loading claims...</p>
+  </div>
+
+  <!-- Assigned Claims Grid -->
+  <div *ngIf="!isLoading" class="claims-grid-container">
+    <h2>Claims List (Only Assigned)</h2>
+    <div class="claims-grid">
+      <div class="grid-header">
+        <div class="grid-col col-claim-number">Claim #</div>
+        <div class="grid-col col-policy-number">Policy #</div>
+        <div class="grid-col col-status">Status</div>
+        <div class="grid-col col-filed-date">Filed Date</div>
+        <div class="grid-col col-unread">Unread</div>
+        <div class="grid-col col-actions">Actions</div>
+      </div>
+
+      <div
+        *ngIf="filteredClaims.length === 0"
+        class="grid-empty"
+      >
+        <p>No claims found matching your criteria.</p>
+      </div>
+
+      <div
+        *ngFor="let claim of filteredClaims"
+        class="grid-row"
+        (click)="navigateToClaimDetails(claim.claimId)"
+      >
+        <div class="grid-col col-claim-number">{{ claim.claimNumber }}</div>
+        <div class="grid-col col-policy-number">{{ claim.policyNumber }}</div>
+        <div class="grid-col col-status">
+          <span class="status-badge" [ngClass]="'status-' + claim.status.toLowerCase()">
+            {{ claim.status }}
+          </span>
+        </div>
+        <div class="grid-col col-filed-date">{{ claim.claimFiledOn | date: 'short' }}</div>
+        <div class="grid-col col-unread">
+          <span *ngIf="claim.unreadCommunicationCount > 0" class="unread-count">
+            {{ claim.unreadCommunicationCount }}
+          </span>
+          <span *ngIf="claim.unreadCommunicationCount === 0" class="unread-zero">-</span>
+        </div>
+        <div class="grid-col col-actions">
+          <button
+            class="btn-view"
+            (click)="navigateToClaimDetails(claim.claimId); $event.stopPropagation()"
+            title="View Claim Details"
+          >
+            👁️
+          </button>
+          <button
+            class="btn-chat"
+            (click)="openCommunicationHub(claim.claimId, $event)"
+            title="Open Communication Hub"
+          >
+            💬
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

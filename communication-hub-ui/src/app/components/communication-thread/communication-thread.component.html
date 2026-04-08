@@ -1,0 +1,130 @@
+<div class="communication-thread">
+  <div class="header">
+    <button class="btn-back" (click)="goBack()">← Back</button>
+    <div class="header-title">
+      <h1 *ngIf="thread">
+        🗣️ Communication with {{ thread.partyName }}
+      </h1>
+      <p *ngIf="thread" class="claim-info">
+        Claim #{{ thread.claimNumber }} | Policy #{{ thread.policyNumber }}
+      </p>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading">Loading communication thread...</div>
+
+  <div *ngIf="!isLoading && thread" class="content">
+    <!-- Tab Navigation -->
+    <div class="tabs-container">
+      <div 
+        *ngFor="let tab of tabs" 
+        class="tab-item" 
+        [class.active]="activeTab === tab"
+        (click)="setActiveTab(tab)"
+      >
+        {{ modeIcons[tab] || '📁' }} {{ tab }}
+      </div>
+    </div>
+
+    <!-- Timeline -->
+    <div class="timeline">
+      <div
+        *ngFor="let message of filteredMessages"
+        class="timeline-item"
+        [ngClass]="message.direction.toLowerCase()"
+      >
+        <div class="timeline-marker">
+          {{ getModeIcon(message.direction) }}
+        </div>
+
+        <div class="message-container">
+          <div class="message-header">
+            <span class="direction">{{ message.direction }}</span>
+            <span class="mode-badge">{{ message.mode }}</span>
+            <span class="timestamp">{{ message.timestamp | date: 'medium' }}</span>
+          </div>
+
+          <div class="message-body">
+            {{ message.messageBody }}
+          </div>
+
+          <div *ngIf="message.attachments && message.attachments.length > 0" class="attachments">
+            <span class="attachment-label">📎 Attachments:</span>
+            <div *ngFor="let attachment of message.attachments" class="attachment">
+              <a [href]="attachment.fileUrl" target="_blank">
+                📄 {{ attachment.fileName || 'Download' }}
+              </a>
+              <span class="file-size">({{ attachment.fileSize }} bytes)</span>
+            </div>
+          </div>
+
+          <!-- Notes Section -->
+          <div class="notes-section">
+            <div
+              *ngIf="!editingNotes[message.communicationId]"
+              class="notes-view"
+            >
+              <label>📝 Notes:</label>
+              <div class="notes-content">
+                {{ message.notes || 'No notes' }}
+              </div>
+              <button
+                class="btn-edit"
+                (click)="startEditingNotes(message.communicationId, message.notes)"
+              >
+                ✏️ Edit
+              </button>
+            </div>
+
+            <div
+              *ngIf="editingNotes[message.communicationId] !== undefined"
+              class="notes-edit"
+            >
+              <textarea
+                [(ngModel)]="editingNotes[message.communicationId]"
+                placeholder="Add notes about this message..."
+                class="notes-textarea"
+              ></textarea>
+              <div class="notes-actions">
+                <button
+                  class="btn-save"
+                  (click)="saveNotes(message.communicationId)"
+                >
+                  ✓ Save
+                </button>
+                <button
+                  class="btn-cancel"
+                  (click)="cancelEditingNotes(message.communicationId)"
+                >
+                  ✕ Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="status-indicator">
+            Status: <span class="status" [ngClass]="message.status.toLowerCase()">
+              {{ message.status }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compose Section -->
+    <div class="compose-section">
+      <button class="btn-compose" (click)="openComposeModal()">
+        ✍️ Start New Communication
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Compose Modal -->
+<app-communication-compose
+  *ngIf="showComposeModal"
+  [claimId]="claimId"
+  [partyId]="partyId"
+  (closed)="closeComposeModal()"
+  (sent)="onCommunicationSent()"
+></app-communication-compose>

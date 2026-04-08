@@ -1,0 +1,152 @@
+<div class="communication-hub">
+  <!-- Header -->
+  <div class="hub-header">
+    <div class="header-title">
+      <h1>Unread Communications for Logged-in Adjuster</h1>
+      <p class="subtitle">Communication Hub (To-Do / Unread)</p>
+    </div>
+    <button class="btn-refresh" (click)="loadUnreadCommunications()" [disabled]="isLoading">
+      🔄 Refresh
+    </button>
+  </div>
+
+  <!-- Search & Filter Section -->
+  <div class="search-filter-section">
+    <div class="search-box">
+      <input
+        type="text"
+        placeholder="Search by Claim #, Policy #, or Sender name..."
+        [value]="searchTerm"
+        (input)="onSearchChange($any($event.target).value)"
+        class="search-input"
+      />
+      <span class="search-icon">🔍</span>
+    </div>
+
+    <div class="mode-filter-container">
+      <button class="btn-mode-filter" (click)="toggleModeFilter()">
+        🔽 Filters {{ modeFilter ? '(' + modeFilter + ')' : '' }}
+      </button>
+      <div *ngIf="isModeFilterOpen" class="mode-filter-dropdown">
+        <button
+          *ngFor="let mode of communicationModes"
+          class="filter-option"
+          [ngClass]="{ active: modeFilter === mode }"
+          (click)="onModeFilterChange(mode)"
+        >
+          {{ getModeIcon(mode) }} {{ mode }}
+        </button>
+        <button
+          class="filter-option"
+          [ngClass]="{ active: !modeFilter }"
+          (click)="onModeFilterChange('')"
+        >
+          ✓ All
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <p>Loading communications...</p>
+  </div>
+
+  <!-- No Communications -->
+  <div *ngIf="!isLoading && filteredCommunications.length === 0" class="empty-state">
+    <div class="empty-icon">✅</div>
+    <h2>All caught up!</h2>
+    <p *ngIf="!searchTerm && !modeFilter">You have no unread communications.</p>
+    <p *ngIf="searchTerm || modeFilter">No communications match your filters.</p>
+  </div>
+
+  <!-- Communications Grid (Dashboard Format) -->
+  <div *ngIf="!isLoading && filteredCommunications.length > 0" class="claims-grid-container">
+    <div class="claims-grid">
+      <div class="grid-header">
+        <div class="grid-col col-sender">Sender</div>
+        <div class="grid-col col-claim">Claim #</div>
+        <div class="grid-col col-policy">Policy #</div>
+        <div class="grid-col col-mode">Mode</div>
+        <div class="grid-col col-date">Received Date</div>
+        <div class="grid-col col-actions">Actions</div>
+      </div>
+
+      <div
+        *ngFor="let comm of filteredCommunications"
+        class="grid-row"
+        [ngClass]="{ 'is-read': comm.isRead }"
+        (click)="previewCommunication(comm, $event)"
+      >
+        <div class="grid-col col-sender">{{ comm.senderName }} <span class="unread-dot" *ngIf="!comm.isRead"></span></div>
+        <div class="grid-col col-claim">{{ comm.claimNumber }}</div>
+        <div class="grid-col col-policy">{{ comm.policyNumber }}</div>
+        <div class="grid-col col-mode">{{ getModeIcon(comm.communicationMode) }} {{ comm.communicationMode }}</div>
+        <div class="grid-col col-date">{{ formatDate(comm.receivedAt) }}</div>
+        <div class="grid-col col-actions">
+          <button
+            class="btn-action btn-read"
+            (click)="toggleReadStatus(comm, $event)"
+            [title]="comm.isRead ? 'Mark as Unread' : 'Mark as Read'"
+          >
+            {{ comm.isRead ? '☑️' : '☐' }}
+          </button>
+          <button
+            class="btn-action btn-open"
+            (click)="openClaimThread(comm); $event.stopPropagation()"
+            title="Open Full Thread"
+          >
+            💬
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div *ngIf="showPreviewModal" class="modal-overlay" (click)="closePreviewModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()" *ngIf="selectedCommunication">
+    <button class="btn-close" (click)="closePreviewModal()">✕</button>
+
+    <div class="modal-header">
+      <h2>{{ getModeIcon(selectedCommunication.communicationMode) }} Message Preview</h2>
+    </div>
+
+    <div class="modal-body">
+      <div class="preview-section">
+        <div class="section-label">From:</div>
+        <div class="section-value">{{ selectedCommunication.senderName }}</div>
+      </div>
+
+      <div class="preview-section">
+        <div class="section-label">Claim & Policy:</div>
+        <div class="section-value">
+          {{ selectedCommunication.claimNumber }} | {{ selectedCommunication.policyNumber }}
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <div class="section-label">Mode:</div>
+        <div class="section-value">{{ selectedCommunication.communicationMode }}</div>
+      </div>
+
+      <div class="preview-section">
+        <div class="section-label">Received:</div>
+        <div class="section-value">{{ selectedCommunication.receivedAt | date: 'medium' }}</div>
+      </div>
+
+      <div class="preview-section">
+        <div class="section-label">Message:</div>
+        <div class="section-value message-body">{{ selectedCommunication.messagePreview }}</div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closePreviewModal()">Close</button>
+      <button class="btn btn-primary" (click)="openClaimThread(selectedCommunication)">
+        View Full Thread →
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,142 @@
+<div class="compose-modal-overlay" (click)="closeModal()">
+  <div class="compose-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h2>✍️ New Communication</h2>
+      <button class="btn-close" (click)="closeModal()">✕</button>
+    </div>
+
+    <div *ngIf="isLoading" class="loading">Loading...</div>
+
+    <div *ngIf="!isLoading" class="modal-content">
+      <!-- Mode Selector -->
+      <div class="mode-selector">
+        <label>Communication Mode:</label>
+        <div class="mode-buttons">
+          <button
+            *ngFor="let mode of communicationModes"
+            class="mode-btn"
+            [ngClass]="{ active: selectedMode === mode }"
+            (click)="selectMode(mode)"
+          >
+            {{ modeIcons[mode] }} {{ mode }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Error Message -->
+      <div *ngIf="errorMessage" class="error-message">
+        ⚠️ {{ errorMessage }}
+      </div>
+
+      <!-- Email Form -->
+      <div *ngIf="isEmailMode" class="form-section">
+        <div class="form-group">
+          <label>To:</label>
+          <input
+            type="email"
+            [(ngModel)]="toField"
+            placeholder="Recipient email"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>CC:</label>
+          <input
+            type="email"
+            [(ngModel)]="ccEmail"
+            placeholder="Optional CC recipients"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Subject:</label>
+          <input
+            type="text"
+            [(ngModel)]="subject"
+            placeholder="Email subject"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Message:</label>
+          <textarea
+            [(ngModel)]="body"
+            placeholder="Type your message..."
+            class="form-textarea"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Signature:</label>
+          <textarea
+            [(ngModel)]="signature"
+            placeholder="Email signature"
+            class="form-textarea signature"
+          ></textarea>
+        </div>
+
+        <!-- Attachments -->
+        <div class="form-group">
+          <label>Attachments ({{ attachmentUrls.length }}):</label>
+          <div *ngIf="attachmentUrls.length > 0" class="attachments-list">
+            <div *ngFor="let url of attachmentUrls; let i = index" class="attachment-item">
+              <span>📄 {{ url }}</span>
+              <button
+                type="button"
+                class="btn-remove"
+                (click)="removeAttachment(i)"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          <p class="attachment-note">Attachments can be managed in the advanced settings.</p>
+        </div>
+      </div>
+
+      <!-- SMS/WhatsApp Form -->
+      <div *ngIf="isSmsMode" class="form-section">
+        <div class="form-group">
+          <label>To:</label>
+          <input
+            type="tel"
+            [(ngModel)]="toField"
+            placeholder="e.g. +91XXXXXXXXXX"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Message:</label>
+          <div class="sms-preview">
+            {{ signature }}
+          </div>
+          <textarea
+            [(ngModel)]="body"
+            placeholder="Type your message..."
+            class="form-textarea sms-textarea"
+          ></textarea>
+          <div class="character-count">
+            {{ body.length }} / 160 characters
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeModal()" [disabled]="isSending">
+        Cancel
+      </button>
+      <button
+        class="btn btn-primary"
+        (click)="sendCommunication()"
+        [disabled]="isSending"
+      >
+        {{ isSending ? '⏳ Sending...' : '✓ Send' }}
+      </button>
+    </div>
+  </div>
+</div>
