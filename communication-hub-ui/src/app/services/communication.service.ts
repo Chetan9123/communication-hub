@@ -49,9 +49,7 @@ export class CommunicationService {
 
   constructor(private http: HttpClient) { }
 
-  /**
-   * Gets all unread communications for the logged-in adjuster
-   */
+
   getUnreadCommunications(): Observable<UnreadCommunicationDto[]> {
     return this.http.get<UnreadCommunicationDto[]>(`${this.apiUrl}/unread`);
   }

@@ -22,7 +22,7 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// Sends an outbound email via SendGrid and records it as a Communication.
+    /// Sends an outbound email via SMTP (MailKit) and records it as a Communication.
     /// POST /api/email/send
     /// </summary>
     [HttpPost("send")]
@@ -51,7 +51,7 @@ public class EmailController : ControllerBase
         // Still a 200 — the record is saved; only the actual send may have failed
         return Ok(new
         {
-            message = "Email saved to database but could not be transmitted via SendGrid. Check server logs for details."
+            message = "Email saved to database but could not be transmitted via SMTP. Check server logs for details."
         });
     }
 

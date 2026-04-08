@@ -20,8 +20,9 @@ builder.Services.AddDbContext<CommunicationHubDbContext>(options =>
 builder.Services.AddScoped<ICommunicationService, CommunicationService>();
 builder.Services.AddScoped<IClaimService, ClaimService>();
 builder.Services.AddScoped<IAdjusterService, AdjusterService>();
-builder.Services.AddScoped<IEmailService, SendGridEmailService>();
+builder.Services.AddScoped<IEmailService, MailKitEmailService>();
 builder.Services.AddScoped<ISmsService, TwilioSmsService>();
+builder.Services.AddHostedService<ImapListeningService>();
 
 // Add CORS for Angular frontend
 builder.Services.AddCors(options =>

@@ -95,7 +95,7 @@ public class CommunicationService : ICommunicationService
             .Where(c => c.ClaimId == claimId && c.PartyId == partyId && c.IsActive.HasValue && c.IsActive.Value)
             .Include(c => c.MessageAttachments)
             .Include(c => c.Channel)
-            .OrderBy(c => c.SentAt)
+            .OrderByDescending(c => c.CreatedAt)
             .ToListAsync();
 
         return new CommunicationThreadDto
@@ -109,7 +109,7 @@ public class CommunicationService : ICommunicationService
             {
                 CommunicationId = m.CommunicationId,
                 Direction = m.Direction,
-                Timestamp = m.SentAt,
+                Timestamp = m.SentAt ?? m.ReceivedAt ?? m.CreatedAt,
                 Mode = m.Channel?.Name,
                 MessageBody = m.MessageBody,
                 Status = m.Status,
