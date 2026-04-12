@@ -55,6 +55,12 @@ public partial class CommunicationHubDbContext : DbContext
             entity.HasKey(e => e.ChannelId).HasName("PK__Channel__38C3E8142D4EADAA");
         });
 
+        modelBuilder.Entity<Channel>().HasData(
+            new Channel { ChannelId = 1, Name = "Email", IsActive = true },
+            new Channel { ChannelId = 2, Name = "Sms", IsActive = true },
+            new Channel { ChannelId = 3, Name = "WhatsApp", IsActive = true }
+        );
+
         modelBuilder.Entity<Claim>(entity =>
         {
             entity.ToTable("Claim");
@@ -92,6 +98,7 @@ public partial class CommunicationHubDbContext : DbContext
 
             entity.Property(e => e.CommunicationId).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.Sid).HasMaxLength(100);
 
             entity.HasOne(d => d.Adjuster).WithMany(p => p.Communications).HasConstraintName("FK__Communica__Adjus__5DCAEF64");
 
@@ -115,8 +122,12 @@ public partial class CommunicationHubDbContext : DbContext
             entity.ToTable("MessageAttachment");
             entity.HasKey(e => e.AttachmentId).HasName("PK__MessageA__442C64BE7AE67570");
 
+            entity.HasIndex(e => e.CommunicationId, "IX_MessageAttachment_CommunicationId");
+
             entity.Property(e => e.AttachmentId).HasDefaultValueSql("(newid())");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.S3Key).HasMaxLength(500);
+            entity.Property(e => e.FileName).HasMaxLength(255);
 
             entity.HasOne(d => d.Communication).WithMany(p => p.MessageAttachments).HasConstraintName("FK__MessageAt__Commu__628FA481");
         });

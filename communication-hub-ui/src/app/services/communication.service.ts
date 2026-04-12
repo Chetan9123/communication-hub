@@ -30,6 +30,7 @@ export interface SendCommunicationRequest {
   body: string;
   signature?: string;
   attachmentUrls?: string[];
+  attachmentIds?: string[];
 }
 
 export interface SendCommunicationResponse {
@@ -87,5 +88,24 @@ export class CommunicationService {
    */
   getEnabledChannels(): Observable<{ [key: string]: boolean }> {
     return this.http.get<{ [key: string]: boolean }>(`${this.apiUrl}/channels`);
+  }
+
+  /**
+   * Uploads an attachment to S3
+   */
+  uploadAttachment(file: File): Observable<{ attachmentId: string, fileName: string, s3Key: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{ attachmentId: string, fileName: string, s3Key: string }>(
+      'http://localhost:5192/api/attachments/upload', 
+      formData
+    );
+  }
+
+  /**
+   * Gets a pre-signed or direct URL to download an attachment
+   */
+  getAttachmentUrl(attachmentId: string): Observable<{ url: string, isPreSigned: boolean }> {
+    return this.http.get<{ url: string, isPreSigned: boolean }>(`http://localhost:5192/api/attachments/${attachmentId}/url`);
   }
 }

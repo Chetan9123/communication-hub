@@ -78,23 +78,6 @@
           ></textarea>
         </div>
 
-        <!-- Attachments -->
-        <div class="form-group">
-          <label>Attachments ({{ attachmentUrls.length }}):</label>
-          <div *ngIf="attachmentUrls.length > 0" class="attachments-list">
-            <div *ngFor="let url of attachmentUrls; let i = index" class="attachment-item">
-              <span>📄 {{ url }}</span>
-              <button
-                type="button"
-                class="btn-remove"
-                (click)="removeAttachment(i)"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-          <p class="attachment-note">Attachments can be managed in the advanced settings.</p>
-        </div>
       </div>
 
       <!-- SMS/WhatsApp Form -->
@@ -123,6 +106,43 @@
             {{ body.length }} / 160 characters
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Common Attachments Section (For All Channels) -->
+    <div *ngIf="!isLoading" class="modal-content attachments-section">
+      <div class="form-group">
+        <div class="attachment-header">
+          <label>📎 Attachments ({{ selectedAttachments.length }}):</label>
+          <button type="button" class="btn-attach" (click)="fileInput.click()" [disabled]="isSending">
+            Add File
+          </button>
+          <input 
+            #fileInput
+            type="file"
+            multiple 
+            (change)="onFileSelected($event)" 
+            style="display: none;"
+          />
+        </div>
+
+        <div *ngIf="selectedAttachments.length > 0" class="attachments-list">
+          <div *ngFor="let att of selectedAttachments; let i = index" class="attachment-item" [class.uploading]="att.isUploading">
+            <div class="att-info">
+              <span class="att-icon">{{ att.isUploading ? '⏳' : '📄' }}</span>
+              <span class="att-name">{{ att.name }}</span>
+            </div>
+            <button
+              type="button"
+              class="btn-remove"
+              (click)="removeSelectedAttachment(i)"
+              [disabled]="isSending"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <p class="attachment-note">Supports PDFs, Images, Videos, and Docs (Max 25MB).</p>
       </div>
     </div>
 

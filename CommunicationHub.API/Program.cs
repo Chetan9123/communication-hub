@@ -1,4 +1,5 @@
 using System.Text;
+using CommunicationHub.Infrastructure.Hubs;
 using CommunicationHub.Application.Interfaces;
 using CommunicationHub.Infrastructure.Data;
 using CommunicationHub.Infrastructure.Services;
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddSignalR();
 
 // Add DbContext
 builder.Services.AddDbContext<CommunicationHubDbContext>(options =>
@@ -22,6 +24,19 @@ builder.Services.AddScoped<IClaimService, ClaimService>();
 builder.Services.AddScoped<IAdjusterService, AdjusterService>();
 builder.Services.AddScoped<IEmailService, MailKitEmailService>();
 builder.Services.AddScoped<ISmsService, TwilioSmsService>();
+builder.Services.AddScoped<IWhatsAppService, TwilioWhatsAppService>();
+builder.Services.AddScoped<IStorageService, StorageService>();
+builder.Services.AddScoped<IS3Service, S3Service>();
+
+// Add AWS S3
+var awsOptions = builder.Configuration.GetAWSOptions();
+var awsSection = builder.Configuration.GetSection("AWS");
+if (!string.IsNullOrEmpty(awsSection["AccessKey"]) && !string.IsNullOrEmpty(awsSection["SecretKey"]))
+{
+    awsOptions.Credentials = new Amazon.Runtime.BasicAWSCredentials(awsSection["AccessKey"], awsSection["SecretKey"]);
+}
+builder.Services.AddDefaultAWSOptions(awsOptions);
+builder.Services.AddAWSService<Amazon.S3.IAmazonS3>();
 builder.Services.AddHostedService<ImapListeningService>();
 
 // Add CORS for Angular frontend
@@ -76,8 +91,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 app.UseCors("AllowAll");
+app.UseStaticFiles(); // Serve media from wwwroot
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<MessagingHub>("/hubs/communications");
 
 app.Run();

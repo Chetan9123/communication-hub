@@ -104,3 +104,6 @@ populate-test-data.ps1
 test-cols.cs
 IMPLEMENTATION_CHECKLIST.md
 TESTING_UI_FLOW.md
+tmp
+app_log.txt
+log.txt

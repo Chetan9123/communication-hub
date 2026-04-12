@@ -6,6 +6,8 @@ namespace CommunicationHub.Domain.Entities;
 public partial class Communication
 {
     public Guid CommunicationId { get; set; }
+    
+    public string? Sid { get; set; }
 
     public int? ClaimId { get; set; }
 

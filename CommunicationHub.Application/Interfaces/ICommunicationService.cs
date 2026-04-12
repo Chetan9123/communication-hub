@@ -47,4 +47,15 @@ public interface ICommunicationService
     /// Matches the sender to an InvolvedParty/Claim or logs as unmatched.
     /// </summary>
     Task<bool> ProcessIncomingSmsAsync(string fromNumber, string body, string messageSid);
+
+    /// <summary>
+    /// Processes an incoming WhatsApp message from Twilio.
+    /// Includes media handling and SignalR notification.
+    /// </summary>
+    Task<bool> ProcessIncomingWhatsAppAsync(string fromNumber, string body, string messageSid, List<string>? mediaUrls = null);
+
+    /// <summary>
+    /// Updates the status of a communication based on a technical SID (e.g. Twilio SID).
+    /// </summary>
+    Task<bool> UpdateCommunicationStatusBySidAsync(string sid, string status);
 }

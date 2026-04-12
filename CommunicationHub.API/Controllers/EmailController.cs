@@ -43,7 +43,8 @@ public class EmailController : ControllerBase
             request.Subject,
             request.Body,
             adjusterId,
-            HttpContext.RequestAborted);
+            attachments: null,
+            cancellationToken: HttpContext.RequestAborted);
 
         if (result.Sent)
             return Ok(new { message = "Email sent and recorded successfully.", communicationId = result.CommunicationId });
@@ -56,7 +57,7 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// SendGrid Inbound Parse webhook endpoint.
+    /// Inbound email webhook endpoint.
     /// Receives multipart/form-data and saves the inbound email as a Communication record.
     /// POST /api/email/inbound
     /// </summary>

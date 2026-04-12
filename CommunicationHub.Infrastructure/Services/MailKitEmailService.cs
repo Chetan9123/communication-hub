@@ -48,6 +48,7 @@ public class MailKitEmailService : IEmailService
         string subject,
         string body,
         int adjusterId,
+        IEnumerable<(string FileName, Stream Data, string ContentType)>? attachments = null,
         CancellationToken cancellationToken = default)
     {
         // ── 1. Read & validate SMTP configuration ──────────────────────────────
@@ -75,7 +76,7 @@ public class MailKitEmailService : IEmailService
         if (configOk && smtpConfig != null)
         {
             (sent, sendStatus, errorDetail) = await SendWithRetryAsync(
-                claimId, partyId, smtpConfig, to, subject, body, cancellationToken);
+                claimId, partyId, smtpConfig, to, subject, body, attachments, cancellationToken);
         }
 
         // ── 3. Persist communication record regardless of send outcome ─────────
@@ -175,6 +176,7 @@ public class MailKitEmailService : IEmailService
         string to,
         string subject,
         string body,
+        IEnumerable<(string FileName, Stream Data, string ContentType)>? attachments,
         CancellationToken cancellationToken)
     {
         for (int attempt = 1; attempt <= MaxRetries; attempt++)
@@ -188,25 +190,32 @@ public class MailKitEmailService : IEmailService
 
             try
             {
-                var message = BuildMimeMessage(claimId, partyId, config, to, subject, body);
+                var message = BuildMimeMessage(claimId, partyId, config, to, subject, body, attachments);
 
                 using var smtp = new SmtpClient();
+
+                // For development/troubleshooting: bypass certificate validation if needed
+                smtp.ServerCertificateValidationCallback = (s, c, h, e) => true;
 
                 // Choose SSL/TLS mode
                 var secureOption = config.UseSsl
                     ? SecureSocketOptions.SslOnConnect
                     : SecureSocketOptions.StartTlsWhenAvailable;
 
+                _logger.LogInformation("SMTP Options: Host={Host}, Port={Port}, SSL={Ssl}, Mode={Mode}", 
+                    config.Host, config.Port, config.UseSsl, secureOption);
+
                 await smtp.ConnectAsync(config.Host, config.Port, secureOption, cancellationToken);
-                _logger.LogDebug("Connected to SMTP host {Host}:{Port}", config.Host, config.Port);
+                _logger.LogInformation("Connected successfully to SMTP host {Host}:{Port}", config.Host, config.Port);
 
                 await smtp.AuthenticateAsync(config.Username, config.Password, cancellationToken);
-                _logger.LogDebug("Authenticated as {Username}", config.Username);
+                _logger.LogInformation("Authenticated successfully as {Username}", config.Username);
 
+                var messageId = message.MessageId;
                 await smtp.SendAsync(message, cancellationToken);
                 await smtp.DisconnectAsync(quit: true, cancellationToken);
 
-                _logger.LogInformation("Email sent successfully to {To} on attempt {Attempt}", to, attempt);
+                _logger.LogInformation("Email sent successfully (ID: {Id}) to {To} on attempt {Attempt}", messageId, to, attempt);
                 return (true, "Sent", null);
             }
             catch (OperationCanceledException)
@@ -246,7 +255,7 @@ public class MailKitEmailService : IEmailService
         string to,
         string subject,
         string htmlBody,
-        IEnumerable<(string FileName, byte[] Data, string ContentType)>? attachments = null)
+        IEnumerable<(string FileName, Stream Data, string ContentType)>? attachments = null)
     {
         var message = new MimeMessage();
         

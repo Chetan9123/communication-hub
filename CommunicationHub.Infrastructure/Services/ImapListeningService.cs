@@ -1,12 +1,16 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunicationHub.Domain.Entities;
 using CommunicationHub.Infrastructure.Data;
+using CommunicationHub.Application.Interfaces;
 using MailKit;
 using MailKit.Net.Imap;
 using MailKit.Search;
+using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -51,13 +55,22 @@ public class ImapListeningService : BackgroundService
         bool useSsl = bool.TryParse(useSslStr, out bool s) && s;
 
         // Create a long-running polling loop
+        int retryDelaySeconds = 15;
+        const int maxRetryDelaySeconds = 120;
+        const int standardPollDelay = 30;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 using var client = new ImapClient();
-                await client.ConnectAsync(host, port, useSsl, stoppingToken);
+                // 1. Secure Connection Configuration
+                var secureOption = useSsl ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.Auto;
+                await client.ConnectAsync(host, port, secureOption, stoppingToken);
                 await client.AuthenticateAsync(username, password, stoppingToken);
+
+                // Reset backoff on successful authentication
+                retryDelaySeconds = 15;
 
                 var inbox = client.Inbox;
                 await inbox.OpenAsync(FolderAccess.ReadWrite, stoppingToken);
@@ -80,6 +93,7 @@ public class ImapListeningService : BackgroundService
                     // Client-Side Smart Filter Context
                     using var scope = _serviceProvider.CreateScope();
                     var context = scope.ServiceProvider.GetRequiredService<CommunicationHubDbContext>();
+                    var s3Service = scope.ServiceProvider.GetRequiredService<IS3Service>();
 
                     foreach (var summary in summaries)
                     {
@@ -140,7 +154,7 @@ public class ImapListeningService : BackgroundService
                         if (isValid)
                         {
                             var fullMessage = await inbox.GetMessageAsync(summary.UniqueId, stoppingToken);
-                            await ProcessMessageAsync(fullMessage, targetParty!, context, stoppingToken);
+                            await ProcessMessageAsync(fullMessage, targetParty!, context, s3Service, stoppingToken);
                         }
                         // 5. ELSE -> Ignore email
                         else
@@ -154,20 +168,41 @@ public class ImapListeningService : BackgroundService
                 }
 
                 await client.DisconnectAsync(true, stoppingToken);
+
+                // 4. Controlled Polling Mechanism (Standard flow)
+                await Task.Delay(TimeSpan.FromSeconds(standardPollDelay), stoppingToken);
+            }
+            catch (IOException ex)
+            {
+                // 3. Granular Exception Handling - Network drop
+                _logger.LogError(ex, "IOException: IMAP connection closed by remote host. Retrying in {Delay}s.", retryDelaySeconds);
+                await Task.Delay(TimeSpan.FromSeconds(retryDelaySeconds), stoppingToken);
+                retryDelaySeconds = Math.Min(retryDelaySeconds * 2, maxRetryDelaySeconds);
+            }
+            catch (SocketException ex)
+            {
+                // 3. Granular Exception Handling - TCP disconnect
+                _logger.LogError(ex, "SocketException: Network error communicating with IMAP server. Retrying in {Delay}s.", retryDelaySeconds);
+                await Task.Delay(TimeSpan.FromSeconds(retryDelaySeconds), stoppingToken);
+                retryDelaySeconds = Math.Min(retryDelaySeconds * 2, maxRetryDelaySeconds);
+            }
+            // Add explicit TaskCanceledException guard for stoppingToken interruptions
+            catch (TaskCanceledException)
+            {
+                _logger.LogInformation("IMAP poll was cancelled visually due to service stop requested.");
+                break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while polling IMAP server.");
+                _logger.LogError(ex, "Unexpected error occurred while polling IMAP server. Retrying in {Delay}s.", standardPollDelay);
+                await Task.Delay(TimeSpan.FromSeconds(standardPollDelay), stoppingToken);
             }
-
-            // Waiting 30 seconds before polling again
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
         }
 
         _logger.LogInformation("IMAP Listening Service is stopping.");
     }
 
-    private async Task ProcessMessageAsync(MimeMessage message, InvolvedParty party, CommunicationHubDbContext context, CancellationToken cancellationToken)
+    private async Task ProcessMessageAsync(MimeMessage message, InvolvedParty party, CommunicationHubDbContext context, IS3Service s3Service, CancellationToken cancellationToken)
     {
         var subject = message.Subject;
         var textBody = message.TextBody;
@@ -207,6 +242,64 @@ public class ImapListeningService : BackgroundService
 
         context.Communications.Add(communication);
         await context.SaveChangesAsync(cancellationToken);
+
+        // Process attachments
+        var attachments = message.BodyParts.OfType<MimePart>().Where(part =>
+            part.IsAttachment || !string.IsNullOrEmpty(part.FileName)).ToList();
+
+        if (attachments.Any())
+        {
+            _logger.LogInformation("IMAP: Found {Count} attachments for email. Extracting and uploading to S3.", attachments.Count);
+            
+            foreach (var attachment in attachments)
+            {
+                try
+                {
+                    using var stream = new MemoryStream();
+                    if (attachment.Content != null)
+                    {
+                        await attachment.Content.DecodeToAsync(stream, cancellationToken);
+                        stream.Position = 0; // reset stream position
+
+                        var contentType = attachment.ContentType.MimeType;
+                        var ext = attachment.ContentType.MediaSubtype ?? "bin";
+                        var fileName = attachment.FileName ?? $"attachment_{Guid.NewGuid().ToString().Substring(0, 8)}.{ext}";
+
+                        // Enforce Size validation: ~25MB limit on incoming too
+                        if (stream.Length > 25 * 1024 * 1024)
+                        {
+                            _logger.LogWarning("IMAP: Incoming attachment {FileName} exceeds 25MB limit ({Size} bytes). Skipping.", fileName, stream.Length);
+                            continue;
+                        }
+
+                        // Upload to S3
+                        var s3Key = await s3Service.UploadFileAsync(stream, fileName, contentType, communication.CommunicationId);
+
+                        // Save Metadata to DB
+                        var dbAttachment = new MessageAttachment
+                        {
+                            AttachmentId = Guid.NewGuid(),
+                            CommunicationId = communication.CommunicationId,
+                            FileName = fileName,
+                            S3Key = s3Key,
+                            MimeType = contentType,
+                            FileType = ext,
+                            FileSize = (int)stream.Length,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        context.MessageAttachments.Add(dbAttachment);
+                        _logger.LogInformation("IMAP: Attachment {FileName} correctly saved to DB with S3 Key {S3Key}", fileName, s3Key);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "IMAP: Failed to process attachment {FileName} for Communication {CommId}", attachment.FileName, communication.CommunicationId);
+                }
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+        }
 
         _logger.LogInformation("IMAP: Saved new communication from {SenderEmail} for ClaimId={ClaimId}", senderEmail, claimId);
     }

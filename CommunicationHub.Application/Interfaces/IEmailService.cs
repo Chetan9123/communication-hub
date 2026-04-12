@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,6 +17,7 @@ public interface IEmailService
         string subject,
         string body,
         int adjusterId,
+        IEnumerable<(string FileName, Stream Data, string ContentType)>? attachments = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

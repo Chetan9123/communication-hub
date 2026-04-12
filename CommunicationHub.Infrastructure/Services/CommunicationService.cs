@@ -1,13 +1,20 @@
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CommunicationHub.Infrastructure.Hubs;
 using CommunicationHub.API.DTOs;
 using CommunicationHub.Application.Interfaces;
 using CommunicationHub.Infrastructure.Data;
 using CommunicationHub.Domain.Entities;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
 
 namespace CommunicationHub.Infrastructure.Services;
 
@@ -16,17 +23,32 @@ public class CommunicationService : ICommunicationService
     private readonly CommunicationHubDbContext _context;
     private readonly IEmailService _emailService;
     private readonly ISmsService _smsService;
+    private readonly IWhatsAppService _whatsAppService;
+    private readonly IStorageService _storageService;
+    private readonly IS3Service _s3Service;
+    private readonly IHubContext<MessagingHub> _hubContext;
+    private readonly IConfiguration _configuration;
     private readonly ILogger<CommunicationService> _logger;
 
     public CommunicationService(
         CommunicationHubDbContext context, 
         IEmailService emailService, 
         ISmsService smsService,
+        IWhatsAppService whatsAppService,
+        IStorageService storageService,
+        IS3Service s3Service,
+        IHubContext<MessagingHub> hubContext,
+        IConfiguration configuration,
         ILogger<CommunicationService> logger)
     {
         _context = context;
         _emailService = emailService;
         _smsService = smsService;
+        _whatsAppService = whatsAppService;
+        _storageService = storageService;
+        _s3Service = s3Service;
+        _hubContext = hubContext;
+        _configuration = configuration;
         _logger = logger;
     }
 
@@ -158,21 +180,107 @@ public class CommunicationService : ICommunicationService
         Guid assignedCommunicationId;
         string? warningMsg = isChannelEnabled ? null : $"Warning: The '{request.Mode}' channel is currently disabled. The message was stored but not transmitted.";
 
+        // --- Handle Outgoing Attachments ---
+        var outboundAttachments = new List<MessageAttachment>();
+        if (request.AttachmentIds != null && request.AttachmentIds.Any())
+        {
+            outboundAttachments = await _context.MessageAttachments
+                .Where(a => request.AttachmentIds.Contains(a.AttachmentId))
+                .ToListAsync();
+        }
+
         // If the mode is Email, delegate entirely to our specialized IEmailService
         // (It already handles the database logging)
         if (request.Mode == "Email")
         {
-            var result = await _emailService.SendEmailAsync(
-                request.ClaimId,
-                request.PartyId,
-                request.To,
-                request.Subject ?? "Communication Update", // fallback subject
-                body,
-                adjusterId);
+            // Prepare attachments for Email
+            var emailAttachments = new List<(string FileName, Stream Data, string ContentType)>();
 
-            assignedCommunicationId = result.CommunicationId;
-            if (!result.Sent && isChannelEnabled)
-                warningMsg = "Warning: The email was saved to the database but SendGrid failed to transmit it.";
+            try
+            {
+                // Process explicitly mapped database attachments
+                foreach (var att in outboundAttachments)
+                {
+                    if (!string.IsNullOrEmpty(att.S3Key))
+                    {
+                        try 
+                        {
+                            if (att.FileSize > 25 * 1024 * 1024)
+                            {
+                                _logger.LogWarning("Attachment {FileName} exceeds 25MB limit. Skipping.", att.FileName);
+                                continue;
+                            }
+
+                            var stream = await _s3Service.GetFileStreamAsync(att.S3Key);
+                            emailAttachments.Add((att.FileName ?? "attachment", stream, att.MimeType ?? "application/octet-stream"));
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to download S3 attachment {S3Key} for email.", att.S3Key);
+                        }
+                    }
+                }
+
+                // Process URLs explicitly provided by the UI (if any)
+                if (request.AttachmentUrls != null)
+                {
+                    var httpClient = new HttpClient();
+                    int idx = 1;
+                    foreach (var url in request.AttachmentUrls)
+                    {
+                        try 
+                        {
+                            var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                            if (response.IsSuccessStatusCode)
+                            {
+                                if (response.Content.Headers.ContentLength > 25 * 1024 * 1024)
+                                {
+                                    _logger.LogWarning("Attachment URL {Url} exceeds 25MB limit. Skipping.", url);
+                                    continue;
+                                }
+
+                                var stream = await response.Content.ReadAsStreamAsync();
+                                var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+                                
+                                string fileName = $"attachment_{idx}";
+                                try {
+                                    var uri = new Uri(url);
+                                    var name = Path.GetFileName(uri.AbsolutePath);
+                                    if (!string.IsNullOrEmpty(name)) fileName = name;
+                                } catch { }
+
+                                emailAttachments.Add((fileName, stream, contentType));
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Failed to download attachment from URL {Url}", url);
+                        }
+                        idx++;
+                    }
+                }
+
+                var result = await _emailService.SendEmailAsync(
+                    request.ClaimId,
+                    request.PartyId,
+                    request.To,
+                    request.Subject ?? "Communication Update", // fallback subject
+                    body,
+                    adjusterId,
+                    emailAttachments);
+
+                assignedCommunicationId = result.CommunicationId;
+                if (!result.Sent && isChannelEnabled)
+                    warningMsg = "Warning: The email was saved to the database, but it could not be sent via the SMTP service. It remains stored for tracking.";
+            }
+            finally
+            {
+                // Ensure all open streams are disposed immediately after the email sending returns
+                foreach(var (fileName, stream, contentType) in emailAttachments)
+                {
+                    stream?.Dispose();
+                }
+            }
         }
         else if (request.Mode == "SMS")
         {
@@ -200,9 +308,6 @@ public class CommunicationService : ICommunicationService
                 PartyId = request.PartyId,
                 ChannelId = channel.ChannelId,
                 AdjusterId = adjusterId,
-                Direction = "Outgoing",
-                MessageBody = body,
-                MessageType = request.Mode,
                 Status = isSent ? "Sent" : (isChannelEnabled ? "Failed" : "Disabled"),
                 SentAt = isSent ? DateTime.UtcNow : DateTime.UtcNow,
                 ReceivedAt = DateTime.UtcNow,
@@ -213,8 +318,91 @@ public class CommunicationService : ICommunicationService
             };
 
             _context.Communications.Add(communication);
+            
+            // Link attachments to this communication
+            foreach (var att in outboundAttachments)
+            {
+                att.CommunicationId = communication.CommunicationId;
+            }
+            
             await _context.SaveChangesAsync();
             assignedCommunicationId = communication.CommunicationId;
+        }
+        else if (request.Mode == "WhatsApp")
+        {
+            _logger.LogInformation("[CommunicationService] Attempting to send WhatsApp to {To} for ClaimId {ClaimId}", request.To, request.ClaimId);
+            
+            WhatsAppSendResult sendResult = new WhatsAppSendResult { Success = false };
+            if (isChannelEnabled)
+            {
+                // Status callback URL: /api/webhooks/whatsapp/status
+                var baseUrl = _configuration["ApiBaseUrl"] ?? "http://localhost:5192";
+                var statusCallback = $"{baseUrl}/api/webhooks/whatsapp/status";
+
+                // Pre-signed URLs for WhatsApp attachments
+                var mediaUrls = new List<string>();
+                if (request.AttachmentUrls != null) mediaUrls.AddRange(request.AttachmentUrls);
+                
+                foreach (var att in outboundAttachments)
+                {
+                    if (!string.IsNullOrEmpty(att.S3Key))
+                    {
+                        var preSignedUrl = await _s3Service.GeneratePreSignedUrlAsync(att.S3Key, 60);
+                        mediaUrls.Add(preSignedUrl);
+                    }
+                }
+
+                sendResult = await _whatsAppService.SendWhatsAppAsync(request.To, body, mediaUrls, statusCallback);
+                
+                if (!sendResult.Success)
+                {
+                    _logger.LogWarning("[CommunicationService] WhatsApp technical dispatch FAILED for {To}. Error: {Error}", request.To, sendResult.ErrorMessage);
+                    warningMsg = $"Warning: The WhatsApp service (Twilio) failed to deliver the message. {sendResult.ErrorMessage}";
+                }
+            }
+
+            var communication = new Communication
+            {
+                CommunicationId = Guid.NewGuid(),
+                Sid = sendResult.Sid,
+                ClaimId = request.ClaimId,
+                PartyId = request.PartyId,
+                ChannelId = channel.ChannelId,
+                AdjusterId = adjusterId,
+                Direction = "Outgoing",
+                MessageBody = body,
+                MessageType = request.Mode,
+                Status = sendResult.Success ? "Sent" : (isChannelEnabled ? "Failed" : "Disabled"),
+                SentAt = DateTime.UtcNow,
+                ReceivedAt = DateTime.UtcNow,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                ReadAt = true,
+                ReadAtDate = DateTime.UtcNow,
+            };
+
+            _context.Communications.Add(communication);
+            
+            // Link attachments to this communication
+            foreach (var att in outboundAttachments)
+            {
+                att.CommunicationId = communication.CommunicationId;
+            }
+            
+            await _context.SaveChangesAsync();
+            assignedCommunicationId = communication.CommunicationId;
+
+            // Notify real-time clients in the claim group
+            await _hubContext.Clients.Group(request.ClaimId.ToString()).SendAsync("ReceiveCommunication", new
+            {
+                mId = communication.CommunicationId,
+                id = communication.ClaimId,
+                pId = communication.PartyId,
+                dir = communication.Direction,
+                txt = communication.MessageBody,
+                stat = communication.Status,
+                ts = communication.SentAt
+            });
         }
         else
         {
@@ -242,6 +430,13 @@ public class CommunicationService : ICommunicationService
             try
             {
                 _context.Communications.Add(communication);
+
+                // Link attachments to this communication
+                foreach (var att in outboundAttachments)
+                {
+                    att.CommunicationId = communication.CommunicationId;
+                }
+
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateException ex)
@@ -273,21 +468,37 @@ public class CommunicationService : ICommunicationService
 
     public async Task<bool> ProcessIncomingSmsAsync(string fromNumber, string body, string messageSid)
     {
+        return await ProcessIncomingGenericAsync(fromNumber, body, messageSid, "SMS", null);
+    }
+
+    public async Task<bool> ProcessIncomingWhatsAppAsync(string fromNumber, string body, string messageSid, List<string>? mediaUrls = null)
+    {
+        return await ProcessIncomingGenericAsync(fromNumber, body, messageSid, "WhatsApp", mediaUrls);
+    }
+
+    private async Task<bool> ProcessIncomingGenericAsync(string fromNumber, string body, string messageSid, string mode, List<string>? mediaUrls)
+    {
         try
         {
-            _logger.LogInformation("[Webhook] Received incoming SMS. From: {From}, Body: {Body}, SID: {Sid}", 
-                fromNumber, body, messageSid);
+            if (string.IsNullOrWhiteSpace(fromNumber))
+            {
+                _logger.LogWarning("[Webhook] Aborting {Mode} processing: Missing fromNumber.", mode);
+                return false;
+            }
 
+            _logger.LogInformation("[Webhook] Received incoming {Mode}. From: {From}, Body: {Body}, SID: {Sid}", 
+                mode, fromNumber, body, messageSid);
+
+            // Normalize phone number (handle nulls safely)
             var normalizedFrom = NormalizePhoneNumber(fromNumber);
             _logger.LogInformation("[Webhook] Normalized From: {Normalized}", normalizedFrom);
 
             // 1. Try to find the party by phone number
-            // We search for both the raw and normalized version to be safe
             var party = await _context.InvolvedParties
                 .Include(p => p.Claim)
                 .ThenInclude(c => c!.ClaimAdjuster)
-                .Where(p => p.Phone == fromNumber || p.Phone == normalizedFrom)
-                .OrderByDescending(p => p.PartyId) // If multiple, pick the latest one
+                .Where(p => p.Phone == fromNumber || p.Phone == normalizedFrom || (mode == "WhatsApp" && p.Phone == $"whatsapp:{normalizedFrom}"))
+                .OrderByDescending(p => p.PartyId)
                 .FirstOrDefaultAsync();
 
             int? claimId = party?.ClaimId;
@@ -298,53 +509,170 @@ public class CommunicationService : ICommunicationService
             {
                 _logger.LogInformation("[Webhook] Match found: PartyId={PartyId}, ClaimId={ClaimId}", 
                     partyId, claimId);
-                
-                // Try to get the primary adjuster assigned to this claim
                 var assignment = party.Claim?.ClaimAdjuster;
                 adjusterId = assignment?.AdjusterId;
             }
-            else
-            {
-                _logger.LogWarning("[Webhook] No matching party found for phone: {From}", fromNumber);
-            }
 
-            // 2. Resolve Channel ID for SMS (usually 2)
-            var smsChannel = await _context.Channels.FirstOrDefaultAsync(c => c.Name == "SMS");
-            int channelId = smsChannel?.ChannelId ?? 2;
+            // 2. Resolve Channel ID
+            var channel = await _context.Channels.FirstOrDefaultAsync(c => c.Name == mode);
+            int channelId = channel?.ChannelId ?? (mode == "SMS" ? 2 : 3);
 
             // 3. Create the Communication record
             var communication = new Communication
             {
                 CommunicationId = Guid.NewGuid(),
+                Sid = messageSid,
                 ClaimId = claimId,
                 PartyId = partyId,
                 AdjusterId = adjusterId, 
                 ChannelId = channelId,
                 Direction = "Incoming",
                 MessageBody = body,
-                MessageType = "SMS",
+                MessageType = mode,
                 Status = "Received",
                 SentAt = DateTime.UtcNow,
                 ReceivedAt = DateTime.UtcNow,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
-                ReadAt = false, // Incoming messages start as unread
+                ReadAt = false,
                 ReadAtDate = null
             };
 
             _context.Communications.Add(communication);
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("[Webhook] SMS stored successfully. CommunicationId: {Id}", 
-                communication.CommunicationId);
+            // 4. Handle Attachments (Incoming)
+            if (mediaUrls != null && mediaUrls.Any())
+            {
+                var accountSid = _configuration["Twilio:AccountSid"]!;
+                var authToken = _configuration["Twilio:AuthToken"]!;
+                using var client = new HttpClient();
+                var authValue = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{accountSid}:{authToken}"));
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authValue);
+
+                int count = 1;
+                foreach (var url in mediaUrls)
+                {
+                    // Defensive try-catch around each attachment so one failure doesn't break the whole message
+                    try
+                    {
+                        var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            _logger.LogWarning("[Webhook] Failed to access attachment at {Url}. Status: {Status}", url, response.StatusCode);
+                            continue;
+                        }
+
+                        // 1. Validation (Size)
+                        var contentLength = response.Content.Headers.ContentLength;
+                        if (contentLength.HasValue && contentLength.Value > 25 * 1024 * 1024) // 25MB limit
+                        {
+                            _logger.LogWarning("[Webhook] Attachment too large: {Size} bytes. Skipping.", contentLength.Value);
+                            continue;
+                        }
+
+                        // 2. Validation (Type)
+                        var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+                        // Broadened validation: allow images, videos, audio, and common docs
+                        var allowedTypes = new[] { 
+                            "image/jpeg", "image/png", "image/gif", "image/webp",
+                            "video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo",
+                            "audio/mpeg", "audio/wav", "audio/ogg", "audio/aac",
+                            "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            "application/zip", "application/x-zip-compressed", "text/plain"
+                        };
+
+                        if (!allowedTypes.Contains(contentType) && !contentType.StartsWith("image/") && !contentType.StartsWith("video/"))
+                        {
+                            _logger.LogWarning("[Webhook] Unsupported attachment type: {Type}. Skipping.", contentType);
+                            continue;
+                        }
+
+                        // 3. Download and Upload to S3
+                        using var stream = await response.Content.ReadAsStreamAsync();
+                        var extension = contentType.Split('/').LastOrDefault() ?? "bin";
+                        if (extension == "jpeg") extension = "jpg";
+                        var fileName = $"{messageSid}_{count}.{extension}";
+
+                        var s3Key = await _s3Service.UploadFileAsync(stream, fileName, contentType, communication.CommunicationId);
+
+                        // 4. Save Metadata
+                        var attachment = new MessageAttachment
+                        {
+                            AttachmentId = Guid.NewGuid(),
+                            CommunicationId = communication.CommunicationId,
+                            FileName = fileName,
+                            S3Key = s3Key,
+                            MimeType = contentType,
+                            FileType = extension,
+                            FileSize = (int?)(contentLength ?? 0),
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        _context.MessageAttachments.Add(attachment);
+                        count++;
+                        _logger.LogInformation("[Webhook] Attachment saved to S3: {S3Key}", s3Key);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "[Webhook] Unexpected error processing attachment {Url}", url);
+                    }
+                }
+                await _context.SaveChangesAsync();
+            }
+
+            // 5. SignalR Notification
+            if (claimId.HasValue)
+            {
+                await _hubContext.Clients.Group(claimId.Value.ToString()).SendAsync("ReceiveCommunication", new
+                {
+                    mId = communication.CommunicationId,
+                    id = communication.ClaimId,
+                    pId = communication.PartyId,
+                    dir = communication.Direction,
+                    txt = communication.MessageBody,
+                    stat = communication.Status,
+                    ts = communication.ReceivedAt
+                });
+            }
+
+            _logger.LogInformation("[Webhook] {Mode} stored and broadcasted. CommunicationId: {Id}", 
+                mode, communication.CommunicationId);
 
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[Webhook] Error processing incoming SMS from {From}", fromNumber);
+            _logger.LogError(ex, "[Webhook] Error processing incoming {Mode} from {From}", mode, fromNumber);
             return false;
         }
+    }
+
+    public async Task<bool> UpdateCommunicationStatusBySidAsync(string sid, string status)
+    {
+        var comm = await _context.Communications.FirstOrDefaultAsync(c => c.Sid == sid);
+        if (comm == null) return false;
+
+        comm.Status = status;
+        if (status.Equals("delivered", StringComparison.OrdinalIgnoreCase))
+        {
+            comm.DeliveredAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        // Notify client about status change if claimId is known
+        if (comm.ClaimId.HasValue)
+        {
+            await _hubContext.Clients.Group(comm.ClaimId.Value.ToString()).SendAsync("UpdateCommunicationStatus", new
+            {
+                mId = comm.CommunicationId,
+                stat = status
+            });
+        }
+
+        return true;
     }
 
     public async Task<bool> ValidateAdjusterAccessAsync(int adjusterId, int claimId)
@@ -366,14 +694,15 @@ public class CommunicationService : ICommunicationService
         if (string.IsNullOrWhiteSpace(phone))
             return string.Empty;
 
+        // Remove whatsapp: prefix if present
+        var cleanPhone = phone.Replace("whatsapp:", "", StringComparison.OrdinalIgnoreCase).Trim();
+
         // Remove all non-numeric characters except the leading '+'
-        var digits = new string(phone.Where(c => char.IsDigit(c)).ToArray());
+        var digits = new string(cleanPhone.Where(c => char.IsDigit(c)).ToArray());
         
-        if (phone.StartsWith("+"))
+        if (cleanPhone.StartsWith("+"))
             return "+" + digits;
             
-        // If it starts with local prefix, you might want to force a country code here
-        // For now, just return digits or keep it simple
         return digits;
     }
 

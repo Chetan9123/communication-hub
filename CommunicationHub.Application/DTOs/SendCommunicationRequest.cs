@@ -14,4 +14,5 @@ public class SendCommunicationRequest
     public string? Body { get; set; }
     public string? Signature { get; set; }
     public List<string>? AttachmentUrls { get; set; }
+    public List<Guid>? AttachmentIds { get; set; }
 }

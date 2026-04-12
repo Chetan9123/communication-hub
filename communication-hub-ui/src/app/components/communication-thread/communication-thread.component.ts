@@ -117,6 +117,36 @@ export class CommunicationThreadComponent implements OnInit {
     this.activeTab = tab;
   }
 
+  formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  downloadAttachment(attachment: any, event: Event): void {
+    event.preventDefault();
+    if (!attachment.attachmentId) {
+      if (attachment.fileUrl) {
+        window.open(attachment.fileUrl, '_blank');
+      }
+      return;
+    }
+    
+    this.communicationService.getAttachmentUrl(attachment.attachmentId).subscribe({
+      next: (res) => {
+        if (res && res.url) {
+          window.open(res.url, '_blank');
+        }
+      },
+      error: (err) => {
+        console.error('Error fetching attachment URL:', err);
+        alert('Could not download or view the attachment. It may have expired or been removed.');
+      }
+    });
+  }
+
   goBack(): void {
     this.router.navigate(['/claim', this.claimId]);
   }

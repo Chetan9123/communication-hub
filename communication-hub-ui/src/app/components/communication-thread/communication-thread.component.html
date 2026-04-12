@@ -51,10 +51,10 @@
           <div *ngIf="message.attachments && message.attachments.length > 0" class="attachments">
             <span class="attachment-label">📎 Attachments:</span>
             <div *ngFor="let attachment of message.attachments" class="attachment">
-              <a [href]="attachment.fileUrl" target="_blank">
-                📄 {{ attachment.fileName || 'Download' }}
+              <a href="#" (click)="downloadAttachment(attachment, $event)" [title]="attachment.fileName || 'View Attachment'">
+                📄 {{ attachment.fileName || 'View Attachment' }}
               </a>
-              <span class="file-size">({{ attachment.fileSize }} bytes)</span>
+              <span class="file-size" *ngIf="attachment.fileSize">({{ formatBytes(attachment.fileSize) }})</span>
             </div>
           </div>
 

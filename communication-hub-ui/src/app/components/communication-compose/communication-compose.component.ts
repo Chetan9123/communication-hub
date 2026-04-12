@@ -31,6 +31,7 @@ export class CommunicationComposeComponent implements OnInit {
   body: string = '';
   signature: string = 'Best regards,\nAdjuster';
   attachmentUrls: string[] = [];
+  selectedAttachments: { id: string, name: string, isUploading: boolean }[] = [];
 
   isLoading: boolean = false;
   isSending: boolean = false;
@@ -106,7 +107,8 @@ export class CommunicationComposeComponent implements OnInit {
       subject: this.subject,
       body: this.body,
       signature: this.signature,
-      attachmentUrls: this.attachmentUrls
+      attachmentUrls: this.attachmentUrls,
+      attachmentIds: this.selectedAttachments.filter(a => !a.isUploading).map(a => a.id)
     };
 
     this.communicationService.sendCommunication(request).subscribe({
@@ -155,6 +157,37 @@ export class CommunicationComposeComponent implements OnInit {
 
   removeAttachment(index: number): void {
     this.attachmentUrls.splice(index, 1);
+  }
+
+  onFileSelected(event: any): void {
+    const files: FileList = event.target.files;
+    if (files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Add placeholder to UI
+      const index = this.selectedAttachments.push({ id: '', name: file.name, isUploading: true }) - 1;
+
+      // Upload one by one
+      this.communicationService.uploadAttachment(file).subscribe({
+        next: (response) => {
+          this.selectedAttachments[index].id = response.attachmentId;
+          this.selectedAttachments[index].isUploading = false;
+        },
+        error: (error) => {
+          console.error('File upload failed:', error);
+          this.selectedAttachments.splice(index, 1);
+          this.errorMessage = `Failed to upload ${file.name}`;
+        }
+      });
+    }
+    // Clear input so same file can be selected again
+    event.target.value = '';
+  }
+
+  removeSelectedAttachment(index: number): void {
+    this.selectedAttachments.splice(index, 1);
   }
 
   closeModal(): void {

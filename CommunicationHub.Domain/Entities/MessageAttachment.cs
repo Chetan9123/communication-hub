@@ -9,6 +9,10 @@ public partial class MessageAttachment
 
     public Guid? CommunicationId { get; set; }
 
+    public string? FileName { get; set; }
+
+    public string? S3Key { get; set; }
+
     public string? FileUrl { get; set; }
 
     public string? MimeType { get; set; }
