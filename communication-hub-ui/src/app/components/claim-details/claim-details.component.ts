@@ -1,13 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { ClaimService, ClaimDetailsDto, InvolvedPartyDto } from '../../services/claim.service';
 import { CommunicationComposeComponent } from '../communication-compose/communication-compose.component';
 
 @Component({
   selector: 'app-claim-details',
   standalone: true,
-  imports: [CommonModule, CommunicationComposeComponent],
+  imports: [CommonModule, RouterModule, CommunicationComposeComponent],
   templateUrl: './claim-details.component.html',
   styleUrls: ['./claim-details.component.scss']
 })
@@ -50,12 +50,7 @@ export class ClaimDetailsComponent implements OnInit {
   }
 
   openCommunicationHub(party: InvolvedPartyDto): void {
-    this.router.navigate([
-      '/claim',
-      this.claimId,
-      'party',
-      party.partyId
-    ]);
+    this.router.navigate(['/claim', this.claimId, 'party', party.partyId]);
   }
 
   openComposeModal(partyId: number, mode: string, event: Event): void {
@@ -71,6 +66,27 @@ export class ClaimDetailsComponent implements OnInit {
 
   onCommunicationSent(): void {
     this.closeComposeModal();
+  }
+
+  getRoleBadgeClass(type: string): string {
+    const map: { [key: string]: string } = {
+      'Policyholder': 'role-policyholder',
+      'Insured':      'role-insured',
+      'Claimant':     'role-claimant',
+      'Witness':      'role-witness',
+      'Provider':     'role-provider',
+      'Adjuster':     'role-adjuster',
+      'Vendor':       'role-vendor',
+    };
+    return map[type] || 'role-default';
+  }
+
+  getContactedCount(contacted: boolean): number {
+    return this.involvedParties.filter(p => !!(p as any).contacted === contacted).length;
+  }
+
+  getCountByRole(role: string): number {
+    return this.involvedParties.filter(p => p.involvedPartyType === role).length;
   }
 
   getPartyTypeIcon(type: string): string {

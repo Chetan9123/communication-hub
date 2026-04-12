@@ -1,122 +1,175 @@
-<div class="communication-thread">
-  <div class="header">
-    <button class="btn-back" (click)="goBack()">← Back</button>
-    <div class="header-title">
-      <h1 *ngIf="thread">
-        🗣️ Communication with {{ thread.partyName }}
-      </h1>
-      <p *ngIf="thread" class="claim-info">
-        Claim #{{ thread.claimNumber }} | Policy #{{ thread.policyNumber }}
-      </p>
+<div class="app-shell">
+
+  <!-- Left Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h1>ClaimsPro</h1>
+      <p>Insurance Platform</p>
     </div>
-  </div>
+    <nav class="sidebar-nav">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a routerLink="/claims" routerLinkActive="active" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Claims</span>
+      </a>
+      <a routerLink="/communications" routerLinkActive="active" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Communications</span>
+      </a>
+      <a routerLink="/reports" routerLinkActive="active" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Reports</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <a routerLink="/settings" routerLinkActive="active" class="nav-item">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </a>
+    </div>
+  </aside>
 
-  <div *ngIf="isLoading" class="loading">Loading communication thread...</div>
+  <!-- Main Area -->
+  <div class="main-area">
 
-  <div *ngIf="!isLoading && thread" class="content">
-    <!-- Tab Navigation -->
-    <div class="tabs-container">
-      <div 
-        *ngFor="let tab of tabs" 
-        class="tab-item" 
-        [class.active]="activeTab === tab"
-        (click)="setActiveTab(tab)"
-      >
-        {{ modeIcons[tab] || '📁' }} {{ tab }}
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-search">
+        <svg class="search-icon-header" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" placeholder="Search claims, parties, communications..." class="header-search-input" />
       </div>
-    </div>
-
-    <!-- Timeline -->
-    <div class="timeline">
-      <div
-        *ngFor="let message of filteredMessages"
-        class="timeline-item"
-        [ngClass]="message.direction.toLowerCase()"
-      >
-        <div class="timeline-marker">
-          {{ getModeIcon(message.direction) }}
-        </div>
-
-        <div class="message-container">
-          <div class="message-header">
-            <span class="direction">{{ message.direction }}</span>
-            <span class="mode-badge">{{ message.mode }}</span>
-            <span class="timestamp">{{ message.timestamp | date: 'medium' }}</span>
-          </div>
-
-          <div class="message-body">
-            {{ message.messageBody }}
-          </div>
-
-          <div *ngIf="message.attachments && message.attachments.length > 0" class="attachments">
-            <span class="attachment-label">📎 Attachments:</span>
-            <div *ngFor="let attachment of message.attachments" class="attachment">
-              <a href="#" (click)="downloadAttachment(attachment, $event)" [title]="attachment.fileName || 'View Attachment'">
-                📄 {{ attachment.fileName || 'View Attachment' }}
-              </a>
-              <span class="file-size" *ngIf="attachment.fileSize">({{ formatBytes(attachment.fileSize) }})</span>
-            </div>
-          </div>
-
-          <!-- Notes Section -->
-          <div class="notes-section">
-            <div
-              *ngIf="!editingNotes[message.communicationId]"
-              class="notes-view"
-            >
-              <label>📝 Notes:</label>
-              <div class="notes-content">
-                {{ message.notes || 'No notes' }}
-              </div>
-              <button
-                class="btn-edit"
-                (click)="startEditingNotes(message.communicationId, message.notes)"
-              >
-                ✏️ Edit
-              </button>
-            </div>
-
-            <div
-              *ngIf="editingNotes[message.communicationId] !== undefined"
-              class="notes-edit"
-            >
-              <textarea
-                [(ngModel)]="editingNotes[message.communicationId]"
-                placeholder="Add notes about this message..."
-                class="notes-textarea"
-              ></textarea>
-              <div class="notes-actions">
-                <button
-                  class="btn-save"
-                  (click)="saveNotes(message.communicationId)"
-                >
-                  ✓ Save
-                </button>
-                <button
-                  class="btn-cancel"
-                  (click)="cancelEditingNotes(message.communicationId)"
-                >
-                  ✕ Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="status-indicator">
-            Status: <span class="status" [ngClass]="message.status.toLowerCase()">
-              {{ message.status }}
-            </span>
+      <div class="header-right">
+        <button class="btn-bell">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="bell-dot"></span>
+        </button>
+        <div class="user-profile">
+          <div class="avatar">JD</div>
+          <div class="user-info">
+            <span class="user-name">Jane Doe</span>
+            <span class="user-role">Claims Manager</span>
           </div>
         </div>
       </div>
-    </div>
+    </header>
 
-    <!-- Compose Section -->
-    <div class="compose-section">
-      <button class="btn-compose" (click)="openComposeModal()">
-        ✍️ Start New Communication
-      </button>
-    </div>
+    <!-- Page Content -->
+    <main class="page-content">
+      <div class="thread-page">
+
+        <!-- Party Header -->
+        <div *ngIf="thread" class="party-header">
+          <button class="btn-back" (click)="goBack()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back
+          </button>
+          <div class="party-info">
+            <h1>{{ thread.partyName }}</h1>
+            <div class="party-meta">
+              <span class="meta-item">{{ thread.partyEmail }}</span>
+              <span class="meta-dot">•</span>
+              <span class="meta-item">{{ thread.partyPhone }}</span>
+              <span class="meta-dot">•</span>
+              <span class="role-badge">{{ thread.partyRole }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="isLoading" class="empty-state">Loading communication thread...</div>
+
+        <div *ngIf="!isLoading && thread">
+
+          <!-- Action Buttons -->
+          <div class="action-bar">
+            <button class="btn-action btn-sms" (click)="openComposeModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Send SMS
+            </button>
+            <button class="btn-action btn-outline" (click)="openComposeModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              Send Email
+            </button>
+            <button class="btn-action btn-outline" (click)="openComposeModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6 19.79 19.79 0 0 1 1.61 5a2 2 0 0 1 1.99-2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.3a16 16 0 0 0 6 6l1.27-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 17.92z"/></svg>
+              Send WhatsApp
+            </button>
+          </div>
+
+          <!-- Timeline -->
+          <h2 class="timeline-heading">Communication Timeline</h2>
+
+          <div *ngIf="filteredMessages.length === 0" class="empty-state">
+            No communications yet. Start a conversation using the buttons above.
+          </div>
+
+          <div class="timeline">
+            <div
+              *ngFor="let message of filteredMessages"
+              class="timeline-card"
+              [ngClass]="message.direction === 'Outgoing' ? 'outgoing' : 'incoming'"
+            >
+              <!-- Direction Icon -->
+              <div class="direction-icon" [ngClass]="message.direction === 'Outgoing' ? 'icon-outgoing' : 'icon-incoming'">
+                <svg *ngIf="message.direction === 'Outgoing'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                <svg *ngIf="message.direction !== 'Outgoing'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="17" y1="7" x2="7" y2="17"/><polyline points="17 17 7 17 7 7"/></svg>
+              </div>
+
+              <!-- Message Content -->
+              <div class="message-content">
+                <div class="message-meta">
+                  <span class="mode-badge" [ngClass]="'mode-' + message.mode?.toLowerCase()">
+                    {{ message.mode }}
+                  </span>
+                  <span class="timestamp">{{ message.timestamp | date: 'MMM d, yyyy, hh:mm a' }}</span>
+                  <span class="direction-badge" [ngClass]="message.direction === 'Outgoing' ? 'dir-outgoing' : 'dir-incoming'">
+                    {{ message.direction }}
+                  </span>
+                </div>
+
+                <p class="message-body">{{ message.messageBody }}</p>
+
+                <!-- Attachments -->
+                <div *ngIf="message.attachments && message.attachments.length > 0" class="attachments">
+                  <span class="attach-label">Attachments:</span>
+                  <div *ngFor="let att of message.attachments" class="attach-item">
+                    <a [href]="att.fileUrl" target="_blank">{{ att.fileName || 'Download' }}</a>
+                    <span class="attach-size">({{ att.fileSize }} bytes)</span>
+                  </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="notes-section">
+                  <div *ngIf="editingNotes[message.communicationId] === undefined" class="notes-view">
+                    <span class="notes-label">Notes:</span>
+                    <button class="btn-edit-notes" (click)="startEditingNotes(message.communicationId, message.notes)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      Edit
+                    </button>
+                    <p class="notes-text">{{ message.notes || 'No notes added' }}</p>
+                  </div>
+
+                  <div *ngIf="editingNotes[message.communicationId] !== undefined" class="notes-edit">
+                    <textarea
+                      [(ngModel)]="editingNotes[message.communicationId]"
+                      placeholder="Add notes about this message..."
+                      class="notes-textarea"
+                    ></textarea>
+                    <div class="notes-actions">
+                      <button class="btn-save" (click)="saveNotes(message.communicationId)">Save</button>
+                      <button class="btn-cancel-notes" (click)="cancelEditingNotes(message.communicationId)">Cancel</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
   </div>
 </div>
 

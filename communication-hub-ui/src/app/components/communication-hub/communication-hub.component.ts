@@ -1,13 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { CommunicationService, UnreadCommunicationDto, UpdateReadStatusRequest } from '../../services/communication.service';
 
 @Component({
   selector: 'app-communication-hub',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './communication-hub.component.html',
   styleUrls: ['./communication-hub.component.scss']
 })
@@ -19,15 +19,13 @@ export class CommunicationHubComponent implements OnInit {
   modeFilter: string = '';
   isModeFilterOpen: boolean = false;
 
-  // Preview Modal State
   showPreviewModal: boolean = false;
   selectedCommunication: UnreadCommunicationDto | null = null;
 
-  // Mode Icons
   modeIcons: { [key: string]: string } = {
     'Email': '📧',
-    'SMS': '📱',
-    'WhatsApp': '💬',
+    'SMS': '💬',
+    'WhatsApp': '📱',
     'Text': '✉️'
   };
 
@@ -40,7 +38,6 @@ export class CommunicationHubComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadUnreadCommunications();
-    // Refresh every 30 seconds
     setInterval(() => this.loadUnreadCommunications(), 30000);
   }
 
@@ -67,9 +64,7 @@ export class CommunicationHubComponent implements OnInit {
         comm.claimNumber.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
         comm.policyNumber.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
         comm.senderName.toLowerCase().includes(this.searchTerm.toLowerCase());
-
       const matchesMode = !this.modeFilter || comm.communicationMode === this.modeFilter;
-
       return matchesSearch && matchesMode;
     });
   }
@@ -103,12 +98,10 @@ export class CommunicationHubComponent implements OnInit {
   toggleReadStatus(communication: UnreadCommunicationDto, event: Event): void {
     event.stopPropagation();
     const request: UpdateReadStatusRequest = { isRead: !communication.isRead };
-
     this.communicationService.updateReadStatus(communication.communicationId, request).subscribe({
       next: () => {
         communication.isRead = !communication.isRead;
         if (communication.isRead) {
-          // Remove from list if marked as read
           this.unreadCommunications = this.unreadCommunications.filter(
             c => c.communicationId !== communication.communicationId
           );
@@ -124,23 +117,11 @@ export class CommunicationHubComponent implements OnInit {
     const request: UpdateReadStatusRequest = { isRead: true };
     this.communicationService.updateReadStatus(communication.communicationId, request).subscribe({
       next: () => {
-        // Automatically removed from unread list; navigate to history
-        this.router.navigate([
-          '/claim',
-          communication.claimId,
-          'party',
-          communication.partyId
-        ]);
+        this.router.navigate(['/claim', communication.claimId, 'party', communication.partyId]);
       },
       error: (err) => {
         console.error('Error marking as read:', err);
-        // Navigate anyway as a fallback
-        this.router.navigate([
-          '/claim',
-          communication.claimId,
-          'party',
-          communication.partyId
-        ]);
+        this.router.navigate(['/claim', communication.claimId, 'party', communication.partyId]);
       }
     });
   }
@@ -149,16 +130,15 @@ export class CommunicationHubComponent implements OnInit {
     return this.modeIcons[mode] || '📪';
   }
 
+  getCountByMode(mode: string): number {
+    return this.unreadCommunications.filter(c => c.communicationMode === mode).length;
+  }
+
   formatDate(date: Date): string {
     const now = new Date();
     const diffInHours = (now.getTime() - new Date(date).getTime()) / (1000 * 60 * 60);
-
-    if (diffInHours < 1) {
-      return 'Just now';
-    } else if (diffInHours < 24) {
-      return `${Math.floor(diffInHours)}h ago`;
-    } else {
-      return new Date(date).toLocaleDateString();
-    }
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
+    return new Date(date).toLocaleDateString();
   }
 }

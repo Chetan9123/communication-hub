@@ -157,106 +157,39 @@
           }
         }
 
-    .attachments-section {
-      padding-top: 0;
-      margin-top: -10px;
+        .attachments-list {
+          margin-bottom: 10px;
 
-      .attachment-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 15px;
-
-        label {
-          margin-bottom: 0;
-        }
-
-        .btn-attach {
-          background-color: #2196F3;
-          color: white;
-          border: none;
-          padding: 6px 12px;
-          border-radius: 4px;
-          font-size: 12px;
-          font-weight: bold;
-          cursor: pointer;
-          transition: background 0.2s;
-
-          &:hover:not(:disabled) {
-            background-color: #1976D2;
-          }
-
-          &:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-          }
-        }
-      }
-
-      .attachments-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        .attachment-item {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 8px 12px;
-          background: #f8f9fa;
-          border: 1px solid #eee;
-          border-radius: 6px;
-          transition: all 0.2s;
-
-          &.uploading {
-            background: #fff8e1;
-            border-color: #ffe082;
-            opacity: 0.8;
-          }
-
-          .att-info {
+          .attachment-item {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 10px;
-            overflow: hidden;
+            background-color: #f5f5f5;
+            padding: 10px 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 13px;
 
-            .att-icon {
+            .btn-remove {
+              background: none;
+              border: none;
+              color: #999;
+              cursor: pointer;
               font-size: 16px;
-              flex-shrink: 0;
-            }
 
-            .att-name {
-              font-size: 13px;
-              color: #444;
-              white-space: nowrap;
-              overflow: hidden;
-              text-overflow: ellipsis;
-            }
-          }
-
-          .btn-remove {
-            background: none;
-            border: none;
-            color: #ccc;
-            cursor: pointer;
-            font-size: 14px;
-            padding: 4px;
-            line-height: 1;
-
-            &:hover {
-              color: #f44336;
+              &:hover {
+                color: #c62828;
+              }
             }
           }
         }
-      }
 
-      .attachment-note {
-        margin-top: 10px;
-        font-size: 11px;
-        color: #888;
-        font-style: italic;
-      }
-    }
+        .attachment-note {
+          font-size: 12px;
+          color: #999;
+          margin: 0;
+          font-style: italic;
+        }
 
         .sms-preview {
           background-color: #f9f9f9;

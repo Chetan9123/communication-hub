@@ -1,104 +1,88 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Component, OnInit, HostListener } from '@angular/core';
+import { CommonModule, DatePipe } from '@angular/common';
+import { RouterModule, Router } from '@angular/router';
+// Your existing services — endpoints unchanged
 import { ClaimService, AssignedClaimDto } from '../../services/claim.service';
 import { UserService, AdjusterDashboardDto } from '../../services/user.service';
 
 @Component({
   selector: 'app-adjuster-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, RouterModule, DatePipe],
   templateUrl: './adjuster-dashboard.component.html',
-  styleUrls: ['./adjuster-dashboard.component.scss']
+  styleUrls: ['./adjuster-dashboard.component.scss'],
 })
 export class AdjusterDashboardComponent implements OnInit {
   dashboard: AdjusterDashboardDto | null = null;
   assignedClaims: AssignedClaimDto[] = [];
-  filteredClaims: AssignedClaimDto[] = [];
-  searchTerm: string = '';
-  statusFilter: string = '';
-  isLoading: boolean = false;
-  statuses: string[] = ['Open', 'In Progress', 'Closed', 'Pending'];
+  isLoading = false;
+  dropdownOpen = false;
 
-  // Syncfusion Grid Configuration
-  gridFields: any[] = [
-    { text: 'Claim Number', value: 'claimNumber' },
-    { text: 'Policy Number', value: 'policyNumber' },
-    { text: 'Status', value: 'status' },
-    { text: 'Filed Date', value: 'claimFiledOn' },
-    { text: 'Unread Messages', value: 'unreadCommunicationCount' }
-  ];
+  // ── Strict-mode safe getters ──────────────────────────────────────────────
+
+  get firstName(): string {
+    const name = this.dashboard?.adjusterName ?? 'Jane';
+    return name.split(' ')[0] ?? name;
+  }
+
+  get userInitials(): string {
+    const name = this.dashboard?.adjusterName ?? 'Jane Doe';
+    return name.split(' ').map((n: string) => n[0] ?? '').join('').toUpperCase().slice(0, 2);
+  }
+
+  get totalUnread(): number {
+    return this.assignedClaims.reduce((sum, c) => sum + (c.unreadCommunicationCount ?? 0), 0);
+  }
+
+  get pendingCount(): number {
+    return this.assignedClaims.filter(c => (c.status ?? '').toLowerCase() === 'pending').length;
+  }
+
+  get resolvedToday(): number {
+    const today = new Date().toDateString();
+    return this.assignedClaims.filter(c =>
+      (c.status ?? '').toLowerCase() === 'closed' &&
+      new Date(c.claimFiledOn).toDateString() === today
+    ).length;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   constructor(
     private claimService: ClaimService,
     private userService: UserService,
     private router: Router
-  ) { }
+  ) {}
 
   ngOnInit(): void {
-    this.loadDashboard();
-  }
-
-  loadDashboard(): void {
     this.isLoading = true;
 
-    // Load dashboard info
+    // Existing endpoints — not changed
     this.userService.getDashboard().subscribe({
-      next: (data) => {
-        this.dashboard = data;
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error loading dashboard:', error);
-        this.isLoading = false;
-      }
+      next: (data) => { this.dashboard = data; },
+      error: () => {}
     });
 
-    // Load assigned claims
     this.claimService.getAssignedClaims().subscribe({
-      next: (claims) => {
-        this.assignedClaims = claims;
-        this.applyFilters();
-      },
-      error: (error) => {
-        console.error('Error loading claims:', error);
-      }
+      next: (claims) => { this.assignedClaims = claims; this.isLoading = false; },
+      error: () => { this.isLoading = false; }
     });
   }
 
-  applyFilters(): void {
-    this.filteredClaims = this.assignedClaims.filter(claim => {
-      const matchesSearch = !this.searchTerm ||
-        claim.claimNumber.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-        claim.policyNumber.toLowerCase().includes(this.searchTerm.toLowerCase());
-
-      const matchesStatus = !this.statusFilter || claim.status === this.statusFilter;
-
-      return matchesSearch && matchesStatus;
-    });
+  toggleDropdown(): void {
+    this.dropdownOpen = !this.dropdownOpen;
   }
 
-  onSearchChange(value: string): void {
-    this.searchTerm = value;
-    this.applyFilters();
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.user-menu')) {
+      this.dropdownOpen = false;
+    }
   }
 
-  onStatusFilterChange(value: string): void {
-    this.statusFilter = value;
-    this.applyFilters();
-  }
-
-  navigateToCommunicationHub(): void {
-    this.router.navigate(['/communications']);
-  }
-
-  navigateToClaimDetails(claimId: number): void {
-    this.router.navigate(['/claim', claimId]);
-  }
-
-  openCommunicationHub(claimId: number, event: Event): void {
-    event.stopPropagation();
-    this.router.navigate(['/claim', claimId]);
+  logout(): void {
+    localStorage.removeItem('token');
+    this.router.navigate(['/login']);
   }
 }
