@@ -45,9 +45,12 @@ public class AuthController : ControllerBase
             if (adjuster == null || !BCrypt.Net.BCrypt.Verify(request.Password, adjuster.PasswordHash))
                 return Unauthorized(new AuthResponse { Success = false, Message = "Invalid email or password" });
 
-            // Check if user is active
+            // Automatically reactivate adjuster on login (if they were inactive/OOO)
             if (adjuster.IsActive == false)
-                return Unauthorized(new AuthResponse { Success = false, Message = "Account is inactive" });
+            {
+                adjuster.IsActive = true;
+                await _context.SaveChangesAsync();
+            }
 
             // Generate JWT token
             var token = GenerateJwtToken(adjuster);
@@ -63,7 +66,7 @@ public class AuthController : ControllerBase
                     FullName = adjuster.FullName,
                     Email = adjuster.Email,
                     Phone = adjuster.Phone,
-                    IsActive = adjuster.IsActive
+                    IsActive = true // Force true in response as we just activated them
                 }
             };
 
