@@ -1,106 +1,174 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { ClaimService, ClaimDetailsDto, InvolvedPartyDto } from '../../services/claim.service';
-import { CommunicationComposeComponent } from '../communication-compose/communication-compose.component';
+import { TabModule, TabComponent } from '@syncfusion/ej2-angular-navigations';
+import { ButtonModule } from '@syncfusion/ej2-angular-buttons';
+import { Api } from '../../api/api';
+import { apiClaimsClaimIdGet$Json } from '../../api/fn/claims/api-claims-claim-id-get-json';
+import { apiCommunicationsClaimClaimIdPartyPartyIdGet$Json } from '../../api/fn/communications/api-communications-claim-claim-id-party-party-id-get-json';
+import { apiCommunicationsCommIdNotesPut$Json } from '../../api/fn/communications/api-communications-comm-id-notes-put-json';
+import { apiAttachmentsAttachmentIdUrlGet } from '../../api/fn/attachments/api-attachments-attachment-id-url-get';
+import { ClaimDetailsDto, InvolvedPartyDto, CommunicationMessageDto, CommunicationThreadDto } from '../../api/models';
+import { ToastService } from '../../services/toast.service';
+import { SmsDialogComponent } from '../sms-dialog/sms-dialog.component';
+import { EmailDialogComponent } from '../email-dialog/email-dialog.component';
+import { WhatsAppDialogComponent } from '../whatsapp-dialog/whatsapp-dialog.component';
+import { AttachmentViewerComponent } from '../attachment-viewer/attachment-viewer.component';
 
 @Component({
   selector: 'app-claim-details',
   standalone: true,
-  imports: [CommonModule, RouterModule, CommunicationComposeComponent],
+  imports: [
+    CommonModule, FormsModule, RouterModule, TabModule, ButtonModule, 
+    SmsDialogComponent, EmailDialogComponent, WhatsAppDialogComponent,
+    AttachmentViewerComponent
+  ],
   templateUrl: './claim-details.component.html',
   styleUrls: ['./claim-details.component.scss']
 })
 export class ClaimDetailsComponent implements OnInit {
-  claimId: number = 0;
-  claimDetails: ClaimDetailsDto | null = null;
-  involvedParties: InvolvedPartyDto[] = [];
-  isLoading: boolean = false;
+  @ViewChild('smsDialog') smsDialog!: SmsDialogComponent;
+  @ViewChild('emailDialog') emailDialog!: EmailDialogComponent;
+  @ViewChild('whatsappDialog') whatsappDialog!: WhatsAppDialogComponent;
 
-  showComposeModal: boolean = false;
-  composePartyId: number = 0;
-  composeInitialMode: string = 'Email';
+  public viewMode: 'parties' | 'history' = 'parties';
+
+  public claimId!: number;
+  public claim: ClaimDetailsDto | null = null;
+  public parties: InvolvedPartyDto[] = [];
+  public messages: CommunicationMessageDto[] = [];
+  public isLoading = false;
+  public historyLoading = false;
+  public selectedParty: InvolvedPartyDto | null = null;
+  public activeTab: string = 'All';
+  public tabs: string[] = ['All', 'Email', 'SMS', 'WhatsApp'];
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private claimService: ClaimService
-  ) { }
+    private api: Api,
+    private toast: ToastService
+  ) {}
 
-  ngOnInit(): void {
-    this.route.paramMap.subscribe(params => {
-      this.claimId = Number(params.get('id'));
-      this.loadClaimDetails();
-    });
-  }
-
-  loadClaimDetails(): void {
-    this.isLoading = true;
-    this.claimService.getClaimDetails(this.claimId).subscribe({
-      next: (data) => {
-        this.claimDetails = data;
-        this.involvedParties = data.involvedParties || [];
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error loading claim details:', error);
-        this.isLoading = false;
+  ngOnInit() {
+    this.route.paramMap.subscribe(p => {
+      const id = p.get('id') || p.get('claimId');
+      const partyId = p.get('partyId');
+      
+      if (id) {
+        this.claimId = Number(id);
+        this.loadClaim(partyId ? Number(partyId) : undefined);
       }
     });
   }
 
-  openCommunicationHub(party: InvolvedPartyDto): void {
-    this.router.navigate(['/claim', this.claimId, 'party', party.partyId]);
+  loadClaim(partyIdToSelect?: number) {
+    this.isLoading = true;
+    this.api.invoke(apiClaimsClaimIdGet$Json, { claimId: this.claimId }).then((c: ClaimDetailsDto) => {
+      this.claim = c;
+      this.parties = c.involvedParties || [];
+      this.isLoading = false;
+
+      // Handle Deep-linking
+      if (partyIdToSelect) {
+        const party = this.parties.find(p => p.partyId === partyIdToSelect);
+        if (party) {
+          this.showHistory(party);
+        }
+      }
+    }).catch(() => {
+      this.isLoading = false;
+      this.toast.error('Error', 'Could not load claim details.');
+    });
   }
 
-  openComposeModal(partyId: number, mode: string, event: Event): void {
-    event.stopPropagation();
-    this.composePartyId = partyId;
-    this.composeInitialMode = mode;
-    this.showComposeModal = true;
+  backToParties() {
+    this.viewMode = 'parties';
+    this.selectedParty = null;
+    this.messages = [];
   }
 
-  closeComposeModal(): void {
-    this.showComposeModal = false;
+  showHistory(party: InvolvedPartyDto) {
+    this.selectedParty = party;
+    this.viewMode = 'history';
+    this.loadHistory(party.partyId as number);
   }
 
-  onCommunicationSent(): void {
-    this.closeComposeModal();
+  get filteredMessages(): CommunicationMessageDto[] {
+    if (this.activeTab === 'All') return this.messages;
+    return this.messages.filter(m => {
+      if (this.activeTab === 'SMS') return m.mode === 'SMS';
+      if (this.activeTab === 'Email') return m.mode === 'Email';
+      if (this.activeTab === 'WhatsApp') return m.mode === 'WhatsApp';
+      return true;
+    });
   }
 
-  getRoleBadgeClass(type: string): string {
-    const map: { [key: string]: string } = {
-      'Policyholder': 'role-policyholder',
-      'Insured':      'role-insured',
-      'Claimant':     'role-claimant',
-      'Witness':      'role-witness',
-      'Provider':     'role-provider',
-      'Adjuster':     'role-adjuster',
-      'Vendor':       'role-vendor',
-    };
-    return map[type] || 'role-default';
+  setActiveTab(tab: string) {
+    this.activeTab = tab;
   }
 
-  getContactedCount(contacted: boolean): number {
-    return this.involvedParties.filter(p => !!(p as any).contacted === contacted).length;
+  loadHistory(partyId: number) {
+    this.historyLoading = true;
+    this.api.invoke(apiCommunicationsClaimClaimIdPartyPartyIdGet$Json, { 
+      claimId: this.claimId,
+      partyId: partyId
+    }).then((t: CommunicationThreadDto) => {
+      this.messages = t.messages || [];
+      this.historyLoading = false;
+    }).catch((err) => {
+      console.error('Error loading history:', err);
+      this.historyLoading = false;
+    });
   }
 
-  getCountByRole(role: string): number {
-    return this.involvedParties.filter(p => p.involvedPartyType === role).length;
+  openSms(party: InvolvedPartyDto, event?: Event) {
+    if (event) event.stopPropagation();
+    this.selectedParty = party;
+    setTimeout(() => this.smsDialog.show(), 0);
   }
 
-  getPartyTypeIcon(type: string): string {
-    const icons: { [key: string]: string } = {
-      'Policyholder': '👤',
-      'Claimant': '🗣️',
-      'Witness': '👁️',
-      'Provider': '🏥',
-      'Adjuster': '💼'
-    };
-    return icons[type] || '👤';
+  openEmail(party: InvolvedPartyDto, event?: Event) {
+    if (event) event.stopPropagation();
+    this.selectedParty = party;
+    setTimeout(() => this.emailDialog.show(), 0);
   }
 
-  goBack(): void {
+  openWhatsApp(party: InvolvedPartyDto, event?: Event) {
+    if (event) event.stopPropagation();
+    this.selectedParty = party;
+    setTimeout(() => this.whatsappDialog.show(), 0);
+  }
+
+  onCommSent() {
+    if (this.selectedParty) {
+      this.loadHistory(this.selectedParty.partyId as number);
+    }
+  }
+
+  updateMessageNotes(msg: CommunicationMessageDto) {
+    this.api.invoke(apiCommunicationsCommIdNotesPut$Json, { 
+      commId: msg.communicationId, 
+      body: { notes: msg.notes } 
+    }).then(() => {
+      this.toast.success('Saved', 'Note updated successfully');
+    }).catch(err => {
+      console.error('Error updating notes:', err);
+      this.toast.error('Error', 'Failed to save note');
+    });
+  }
+
+  downloadAttachment(attachmentId: string) {
+    this.api.invoke(apiAttachmentsAttachmentIdUrlGet, { attachmentId }).then((res: any) => {
+      // Handle download redirect or direct URL
+      if (res && res.url) window.open(res.url, '_blank');
+    }).catch(() => {
+      this.toast.error('Error', 'Failed to download attachment.');
+    });
+  }
+
+  goBack() {
     this.router.navigate(['/dashboard']);
   }
 }

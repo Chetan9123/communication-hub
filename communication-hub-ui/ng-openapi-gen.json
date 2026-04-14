@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/ng-openapi-gen/ng-openapi-gen-schema.json",
+  "input": "http://localhost:5192/openapi/v1.json",
+  "output": "src/app/api",
+  "ignoreUnusedModels": false,
+  "module": "ApiModule",
+  "configuration": "ApiConfiguration",
+  "rootUrl": "http://localhost:5192"
+}

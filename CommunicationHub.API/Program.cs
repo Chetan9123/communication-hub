@@ -27,6 +27,7 @@ builder.Services.AddScoped<ISmsService, TwilioSmsService>();
 builder.Services.AddScoped<IWhatsAppService, TwilioWhatsAppService>();
 builder.Services.AddScoped<IStorageService, StorageService>();
 builder.Services.AddScoped<IS3Service, S3Service>();
+builder.Services.AddScoped<IAutoReplyService, AutoReplyService>();
 
 // Add AWS S3
 var awsOptions = builder.Configuration.GetAWSOptions();

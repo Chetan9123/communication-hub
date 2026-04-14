@@ -58,4 +58,9 @@ public interface ICommunicationService
     /// Updates the status of a communication based on a technical SID (e.g. Twilio SID).
     /// </summary>
     Task<bool> UpdateCommunicationStatusBySidAsync(string sid, string status);
+
+    /// <summary>
+    /// Syncs missing WhatsApp messages from Twilio in the last 24 hours.
+    /// </summary>
+    Task<int> SyncMissedTwilioMessagesAsync();
 }

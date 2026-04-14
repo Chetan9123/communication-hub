@@ -9,6 +9,7 @@ public class AdjusterDashboardDto
     public string? AdjusterName { get; set; }
     public string? Email { get; set; }
     public int UnreadCommunicationCount { get; set; }
+    public bool IsActive { get; set; }
     public List<AssignedClaimDto>? AssignedClaims { get; set; }
 }
 

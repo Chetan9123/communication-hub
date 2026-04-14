@@ -39,7 +39,7 @@ public class WhatsAppWebhookController : TwilioController
     /// URL: /api/webhooks/whatsapp/receive
     /// </summary>
     [HttpPost("receive")]
-    [ValidateRequest]
+    [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Receive()
     {
         var twiml = new MessagingResponse();

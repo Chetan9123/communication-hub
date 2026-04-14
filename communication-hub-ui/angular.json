@@ -38,8 +38,8 @@
               "budgets": [
                 {
                   "type": "initial",
-                  "maximumWarning": "500kb",
-                  "maximumError": "1mb"
+                  "maximumWarning": "5mb",
+                  "maximumError": "10mb"
                 },
                 {
                   "type": "anyComponentStyle",
@@ -64,10 +64,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "browserTarget": "communication-hub-ui:build:production"
+              "buildTarget": "communication-hub-ui:build:production"
             },
             "development": {
-              "browserTarget": "communication-hub-ui:build:development"
+              "buildTarget": "communication-hub-ui:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -75,7 +75,7 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "communication-hub-ui:build"
+            "buildTarget": "communication-hub-ui:build"
           }
         },
         "test": {

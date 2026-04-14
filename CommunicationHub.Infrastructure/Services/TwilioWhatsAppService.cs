@@ -35,6 +35,12 @@ public class TwilioWhatsAppService : IWhatsAppService
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(to))
+            {
+                _logger.LogError("Cannot send WhatsApp: recipient phone number is null or empty.");
+                return new WhatsAppSendResult { Success = false, ErrorMessage = "Recipient phone number is required." };
+            }
+
             // Normalize recipient number to include whatsapp: prefix
             var toWhatsApp = to.StartsWith("whatsapp:") ? to : $"whatsapp:{to}";
             

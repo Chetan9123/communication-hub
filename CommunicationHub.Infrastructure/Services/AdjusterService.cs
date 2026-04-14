@@ -44,7 +44,7 @@ public class AdjusterService : IAdjusterService
                 {
                     // Count unread communications for this claim
                     var unreadInClaim = await _context.Communications
-                        .CountAsync(c => c.ClaimId == claim.ClaimId && !c.ReadAt.HasValue);
+                        .CountAsync(c => c.ClaimId == claim.ClaimId && (c.ReadAt == null || c.ReadAt == false));
 
                     unreadCount += unreadInClaim;
 
@@ -66,6 +66,7 @@ public class AdjusterService : IAdjusterService
                 AdjusterName = adjuster.FullName,
                 Email = adjuster.Email,
                 UnreadCommunicationCount = unreadCount,
+                IsActive = adjuster.IsActive ?? true,
                 AssignedClaims = assignedClaims
             };
         }
@@ -75,5 +76,15 @@ public class AdjusterService : IAdjusterService
             Console.WriteLine($"Error in GetDashboardAsync: {ex.Message}");
             throw;
         }
+    }
+
+    public async Task<bool> ToggleStatusAsync(int adjusterId)
+    {
+        var adjuster = await _context.Adjusters.FirstOrDefaultAsync(a => a.AdjusterId == adjusterId);
+        if (adjuster == null) return false;
+
+        adjuster.IsActive = !(adjuster.IsActive ?? true);
+        await _context.SaveChangesAsync();
+        return adjuster.IsActive.Value;
     }
 }

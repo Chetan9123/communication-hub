@@ -154,6 +154,31 @@ public class CommunicationsController : ControllerBase
     }
 
     /// <summary>
+    /// POST /api/communications/sync-twilio
+    /// Manually triggers a synchronization of missing Twilio WhatsApp messages from the past 24 hours.
+    /// Useful for recovering from server downtime or misconfigurations.
+    /// </summary>
+    [HttpPost("sync-twilio")]
+    [AllowAnonymous]
+    public async Task<ActionResult<int>> SyncTwilioMessages()
+    {
+        try
+        {
+            _logger.LogInformation("[CommunicationsController] Received manual request to sync missed Twilio messages.");
+            
+            // Only adjusters/admins should trigger this, no special parameters needed.
+            var count = await _communicationService.SyncMissedTwilioMessagesAsync();
+            
+            return Ok(new { syncedCount = count, message = $"Successfully synchronized {count} missed messages." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[CommunicationsController] Failed to sync missed Twilio messages.");
+            return StatusCode(500, new { message = "An error occurred during synchronization." });
+        }
+    }
+
+    /// <summary>
     /// GET /api/communications/channels
     /// Gets all enabled communication channels
     /// </summary>

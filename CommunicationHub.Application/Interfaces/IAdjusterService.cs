@@ -10,4 +10,5 @@ public interface IAdjusterService
     /// Gets the adjuster dashboard information
     /// </summary>
     Task<AdjusterDashboardDto> GetDashboardAsync(int adjusterId);
+    Task<bool> ToggleStatusAsync(int adjusterId);
 }

@@ -1,0 +1,66 @@
+<div class="main-shell" [class.collapsed]="isCollapsed">
+  <!-- Dynamic Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-area">
+        <div class="logo-circle">CH</div>
+        <span class="logo-text" *ngIf="!isCollapsed">CommHub</span>
+      </div>
+      <button class="collapse-toggle" (click)="toggleSidebar()">
+        <i class="e-icons" [ngClass]="isCollapsed ? 'e-chevron-right' : 'e-chevron-left'"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a routerLink="/dashboard" routerLinkActive="active" class="nav-item" title="Dashboard">
+        <i class="e-icons e-dashboard"></i>
+        <span *ngIf="!isCollapsed">Dashboard</span>
+      </a>
+      <a routerLink="/communications" routerLinkActive="active" class="nav-item" title="Communications">
+        <i class="e-icons e-comment"></i>
+        <span *ngIf="!isCollapsed">Communications</span>
+      </a>
+      <!-- Add other items as needed -->
+    </nav>
+
+    <div class="sidebar-footer" *ngIf="currentUser">
+      <div class="user-profile">
+        <div class="avatar">{{ currentUser.initials || 'AD' }}</div>
+        <div class="user-meta" *ngIf="!isCollapsed">
+          <div class="user-name">{{ currentUser.name }}</div>
+          <div class="user-role">Adjuster</div>
+        </div>
+      </div>
+      <button class="logout-btn" (click)="logout()" title="Logout" *ngIf="!isCollapsed">
+        <i class="e-icons e-export"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Content Wrapper -->
+  <div class="content-wrapper">
+    <header class="top-header">
+      <div class="header-left">
+        <div class="breadcrumb" *ngIf="!isCollapsed">
+          <span>Communication Hub</span>
+          <i class="e-icons e-chevron-right"></i>
+          <span class="active">Management</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="search-wrap">
+          <i class="e-icons e-search"></i>
+          <input type="text" placeholder="Search claims...">
+        </div>
+        <div class="header-actions">
+          <button class="action-btn"><i class="e-icons e-notification"></i></button>
+          <button class="action-btn"><i class="e-icons e-user"></i></button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-viewport">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

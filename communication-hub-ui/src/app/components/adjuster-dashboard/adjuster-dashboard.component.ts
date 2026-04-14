@@ -1,88 +1,89 @@
-import { Component, OnInit, HostListener } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
-// Your existing services — endpoints unchanged
-import { ClaimService, AssignedClaimDto } from '../../services/claim.service';
-import { UserService, AdjusterDashboardDto } from '../../services/user.service';
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router, RouterModule } from '@angular/router';
+import { GridModule, PageService, SortService, FilterService, ToolbarService, ExcelExportService, PdfExportService, SearchService } from '@syncfusion/ej2-angular-grids';
+import { ButtonModule } from '@syncfusion/ej2-angular-buttons';
+import { Api } from '../../api/api';
+import { apiClaimsAssignedToAdjusterGet$Json } from '../../api/fn/claims/api-claims-assigned-to-adjuster-get-json';
+import { apiUsersDashboardGet$Json } from '../../api/fn/users/api-users-dashboard-get-json';
+import { apiUsersToggleStatusPost$Json } from '../../api/fn/users/api-users-toggle-status-post-json';
+import { apiCommunicationsUnreadGet$Json } from '../../api/fn/communications/api-communications-unread-get-json';
+import { AssignedClaimDto, UnreadCommunicationDto, AdjusterDashboardDto } from '../../api/models';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-adjuster-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, DatePipe],
+  imports: [CommonModule, RouterModule, GridModule, ButtonModule],
+  providers: [PageService, SortService, FilterService, ToolbarService],
   templateUrl: './adjuster-dashboard.component.html',
-  styleUrls: ['./adjuster-dashboard.component.scss'],
+  styleUrls: ['./adjuster-dashboard.component.scss']
 })
 export class AdjusterDashboardComponent implements OnInit {
-  dashboard: AdjusterDashboardDto | null = null;
-  assignedClaims: AssignedClaimDto[] = [];
-  isLoading = false;
-  dropdownOpen = false;
-
-  // ── Strict-mode safe getters ──────────────────────────────────────────────
-
-  get firstName(): string {
-    const name = this.dashboard?.adjusterName ?? 'Jane';
-    return name.split(' ')[0] ?? name;
-  }
-
-  get userInitials(): string {
-    const name = this.dashboard?.adjusterName ?? 'Jane Doe';
-    return name.split(' ').map((n: string) => n[0] ?? '').join('').toUpperCase().slice(0, 2);
-  }
-
-  get totalUnread(): number {
-    return this.assignedClaims.reduce((sum, c) => sum + (c.unreadCommunicationCount ?? 0), 0);
-  }
-
-  get pendingCount(): number {
-    return this.assignedClaims.filter(c => (c.status ?? '').toLowerCase() === 'pending').length;
-  }
-
-  get resolvedToday(): number {
-    const today = new Date().toDateString();
-    return this.assignedClaims.filter(c =>
-      (c.status ?? '').toLowerCase() === 'closed' &&
-      new Date(c.claimFiledOn).toDateString() === today
-    ).length;
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
+  public claims: AssignedClaimDto[] = [];
+  public isActive = true;
+  public isLoading = false;
+  public toolbarOptions: string[] = ['Search'];
+  public pageSettings = { pageSize: 12, pageSizes: [12, 25, 50] };
+  public filterSettings = { type: 'Menu' };
 
   constructor(
-    private claimService: ClaimService,
-    private userService: UserService,
-    private router: Router
+    private api: Api,
+    private router: Router,
+    private toast: ToastService
   ) {}
 
-  ngOnInit(): void {
+  ngOnInit() {
+    this.loadAll();
+  }
+
+  loadAll() {
     this.isLoading = true;
-
-    // Existing endpoints — not changed
-    this.userService.getDashboard().subscribe({
-      next: (data) => { this.dashboard = data; },
-      error: () => {}
-    });
-
-    this.claimService.getAssignedClaims().subscribe({
-      next: (claims) => { this.assignedClaims = claims; this.isLoading = false; },
-      error: () => { this.isLoading = false; }
+    this.api.invoke(apiUsersDashboardGet$Json).then((data: AdjusterDashboardDto) => {
+      this.claims = data.assignedClaims || [];
+      this.isActive = data.isActive ?? true;
+      this.isLoading = false;
+    }).catch(err => {
+      this.isLoading = false;
+      console.error('[AdjusterDashboard] Error loading dashboard:', err);
+      this.toast.error('Error', 'Failed to load dashboard data.');
     });
   }
 
-  toggleDropdown(): void {
-    this.dropdownOpen = !this.dropdownOpen;
+  toggleStatus() {
+    this.api.invoke(apiUsersToggleStatusPost$Json).then((result: boolean) => {
+      this.isActive = result;
+      this.toast.success('Status Updated', `You are now ${this.isActive ? 'Active' : 'Out of Office'}.`);
+    }).catch(err => {
+      console.error('[AdjusterDashboard] Error toggling status:', err);
+      this.toast.error('Error', 'Failed to update status.');
+    });
   }
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    if (!target.closest('.user-menu')) {
-      this.dropdownOpen = false;
-    }
+  loadUnread() {
+    this.isLoading = true;
+    this.api.invoke(apiCommunicationsUnreadGet$Json).then((msgs: UnreadCommunicationDto[]) => {
+      const claimIds = new Set(msgs.map(m => m.claimId));
+      this.claims = this.claims.filter(c => claimIds.has(c.claimId as number));
+      this.isLoading = false;
+      this.toast.success('Filtered', `Showing ${this.claims.length} claims with unread messages.`);
+    }).catch(err => {
+      this.isLoading = false;
+      console.error('[AdjusterDashboard] Error loading unread claims:', err);
+    });
   }
 
-  logout(): void {
-    localStorage.removeItem('token');
-    this.router.navigate(['/login']);
+  onRowSelected(args: any) {
+    if (args.data) this.openClaim(args.data.claimId);
+  }
+
+  openClaim(claimId: any) {
+    this.router.navigate(['/claims', claimId, 'details']);
+  }
+
+  onToolbarClick(args: any) {
+    const grid = (document.getElementsByClassName('e-grid')[0] as any).ej2_instances[0];
+    if (args.item.id.includes('excel-export')) grid.excelExport();
+    if (args.item.id.includes('csv-export')) grid.csvExport();
   }
 }

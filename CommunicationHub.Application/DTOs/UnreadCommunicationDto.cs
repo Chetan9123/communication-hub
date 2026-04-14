@@ -18,4 +18,5 @@ public class UnreadCommunicationDto
     public DateTime? ReceivedAt { get; set; }
     public bool? IsRead { get; set; }
     public string? Status { get; set; }
+    public List<AttachmentDto>? Attachments { get; set; }
 }

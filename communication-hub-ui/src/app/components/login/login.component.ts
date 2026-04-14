@@ -31,20 +31,20 @@ export class LoginComponent {
     this.isLoading = true;
     this.errorMessage = '';
 
-    // this.authService.login(this.email, this.password).subscribe({
-    //   next: (response) => {
-    //     if (response.success) {
-          this.router.navigate(['/adjuster-dashboard']);
-    //     } else {
-    //       this.isLoading = false;
-    //       this.errorMessage = response.message || 'Login failed. Please try again.';
-    //     }
-    //   },
-    //   error: (error) => {
-    //     this.isLoading = false;
-    //     this.errorMessage = error.error?.message || error.message || 'Login failed. Please try again.';
-    //   }
-    // });
+    this.authService.login(this.email, this.password).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.router.navigate(['/dashboard']);
+        } else {
+          this.isLoading = false;
+          this.errorMessage = response.message || 'Login failed. Please try again.';
+        }
+      },
+      error: (error) => {
+        this.isLoading = false;
+        this.errorMessage = error.error?.message || error.message || 'Login failed. Please try again.';
+      }
+    });
   }
 
   navigateToSignup(): void {

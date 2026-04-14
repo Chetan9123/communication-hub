@@ -10,6 +10,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MimeKit;
 
@@ -23,6 +24,7 @@ namespace CommunicationHub.Infrastructure.Services;
 public class MailKitEmailService : IEmailService
 {
     private readonly CommunicationHubDbContext _context;
+    private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ILogger<MailKitEmailService> _logger;
 
@@ -31,10 +33,12 @@ public class MailKitEmailService : IEmailService
 
     public MailKitEmailService(
         CommunicationHubDbContext context,
+        IServiceProvider serviceProvider,
         IConfiguration configuration,
         ILogger<MailKitEmailService> logger)
     {
         _context       = context;
+        _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger        = logger;
     }
@@ -158,6 +162,16 @@ public class MailKitEmailService : IEmailService
                 "Inbound email saved. CommunicationId={Id} ClaimId={ClaimId}",
                 communication.CommunicationId, communication.ClaimId);
 
+            // Trigger Auto-Reply if Adjuster is Inactive (Background task)
+            if (finalClaimId.HasValue && party?.PartyId != null)
+            {
+                _ = Task.Run(async () => {
+                    using var scope = _serviceProvider.CreateScope();
+                    var autoReplyService = scope.ServiceProvider.GetRequiredService<IAutoReplyService>();
+                    await autoReplyService.TriggerAutoReplyIfInactiveAsync(finalClaimId.Value, party.PartyId, "Email");
+                });
+            }
+
             return true;
         }
         catch (Exception ex)
@@ -223,22 +237,28 @@ public class MailKitEmailService : IEmailService
                 _logger.LogWarning("SMTP send cancelled on attempt {Attempt}", attempt);
                 return (false, "Failed", "Request was cancelled.");
             }
+            catch (MailKit.Security.AuthenticationException authEx)
+            {
+                _logger.LogError(authEx, "SMTP Authentication failed for user '{Username}'. Verify app password. Error: {Msg}", config.Username, authEx.Message);
+                return (false, "Failed", $"Authentication failed: {authEx.Message}");
+            }
+            catch (System.Net.Sockets.SocketException sockEx)
+            {
+                _logger.LogError(sockEx, "SMTP Connection failed to {Host}:{Port}. Verify host/port/firewall. Error: {Msg}", config.Host, config.Port, sockEx.Message);
+                return (false, "Failed", $"Connection failed: {sockEx.Message}");
+            }
             catch (Exception ex) when (attempt < MaxRetries)
             {
-                int delay = BaseDelayMs * (int)Math.Pow(2, attempt - 1); // 500ms, 1000ms, ...
+                int delay = BaseDelayMs * (int)Math.Pow(2, attempt - 1);
                 _logger.LogWarning(
-                    ex,
-                    "SMTP send failed on attempt {Attempt}/{Max}. Retrying in {Delay}ms. Error: {Message}",
+                    ex, "SMTP error on attempt {Attempt}/{Max}. Retrying in {Delay}ms. Error: {Message}",
                     attempt, MaxRetries, delay, ex.Message);
 
                 await Task.Delay(delay, cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex,
-                    "SMTP send failed permanently after {Max} attempts. Error: {Message}",
-                    MaxRetries, ex.Message);
+                _logger.LogError(ex, "SMTP send failed permanently after {Max} attempts. Error: {Message}", MaxRetries, ex.Message);
                 return (false, "Failed", ex.Message);
             }
         }

@@ -40,4 +40,25 @@ public class UsersController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// POST /api/users/toggle-status
+    /// Toggles the adjuster's IsActive status
+    /// </summary>
+    [HttpPost("toggle-status")]
+    public async Task<ActionResult<bool>> ToggleStatus()
+    {
+        try
+        {
+            if (!User.TryGetAdjusterId(out var adjusterId))
+                return Unauthorized(new { message = "Invalid token" });
+
+            var result = await _adjusterService.ToggleStatusAsync(adjusterId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

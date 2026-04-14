@@ -43,6 +43,8 @@ public class ClaimService : IClaimService
     {
         var claim = await _context.Claims
             .Include(c => c.InvolvedParties)
+            .Include(c => c.ClaimAdjuster)
+            .ThenInclude(ca => ca!.Adjuster)
             .FirstOrDefaultAsync(c => c.ClaimId == claimId);
 
         if (claim == null)
@@ -56,6 +58,8 @@ public class ClaimService : IClaimService
             ClaimFiledOn = claim.ClaimFiledOn,
             ClaimClosedOn = claim.ClaimClosedOn,
             Status = claim.Status,
+            AssignedAdjusterName = claim.ClaimAdjuster?.Adjuster?.FullName,
+            IsAdjusterActive = claim.ClaimAdjuster?.Adjuster?.IsActive,
             InvolvedParties = claim.InvolvedParties
                 .Where(p => p.IsActive.HasValue && p.IsActive.Value)
                 .Select(p => new InvolvedPartyDto

@@ -42,7 +42,7 @@ export class AuthService {
   constructor(private http: HttpClient) {}
 
   login(email: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/dashboard`, { email, password })
+    return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { email, password })
       .pipe(
         tap(response => {
           if (response.success && response.token && response.user) {
@@ -53,7 +53,7 @@ export class AuthService {
   }
 
   signup(fullName: string, email: string, password: string, confirmPassword: string, phone?: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/dashboard`, { 
+    return this.http.post<AuthResponse>(`${this.apiUrl}/signup`, { 
       fullName, 
       email, 
       password, 

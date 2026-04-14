@@ -37,6 +37,12 @@ public class TwilioSmsService : ISmsService
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(to))
+            {
+                _logger.LogError("Cannot send SMS: recipient phone number is null or empty.");
+                return false;
+            }
+
             _logger.LogInformation("Attempting to send SMS to {To}", to);
 
             var messageResource = await MessageResource.CreateAsync(

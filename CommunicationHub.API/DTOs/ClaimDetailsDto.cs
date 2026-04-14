@@ -11,6 +11,8 @@ public class ClaimDetailsDto
     public DateTime? ClaimFiledOn { get; set; }
     public DateTime? ClaimClosedOn { get; set; }
     public string? Status { get; set; }
+    public string? AssignedAdjusterName { get; set; }
+    public bool? IsAdjusterActive { get; set; }
     public List<InvolvedPartyDto>? InvolvedParties { get; set; }
 }
 

@@ -40,6 +40,8 @@ public partial class Communication
     public bool? IsActive { get; set; }
 
     public DateTime? CreatedAt { get; set; }
+    
+    public string? Notes { get; set; }
 
 
     public virtual Adjuster? Adjuster { get; set; }

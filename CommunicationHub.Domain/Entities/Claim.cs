@@ -18,6 +18,8 @@ public partial class Claim
     public string? Status { get; set; }
 
     public DateTime? CreatedAt { get; set; }
+    
+    public DateTime? LastAutoReplySent { get; set; }
 
     public virtual ClaimAdjuster? ClaimAdjuster { get; set; }
 

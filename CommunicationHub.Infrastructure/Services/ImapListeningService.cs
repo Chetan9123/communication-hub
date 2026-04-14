@@ -75,18 +75,13 @@ public class ImapListeningService : BackgroundService
                 var inbox = client.Inbox;
                 await inbox.OpenAsync(FolderAccess.ReadWrite, stoppingToken);
 
-                // Fetch unread messages with Smart Filtering (Primary: Headers, Secondary: Subject)
-                var query = SearchQuery.NotSeen.And(
-                    SearchQuery.HeaderContains("In-Reply-To", "@commhub.local")
-                    .Or(SearchQuery.HeaderContains("References", "@commhub.local"))
-                    .Or(SearchQuery.SubjectContains("Claim #"))
-                );
-
-                var uids = await inbox.SearchAsync(query, stoppingToken);
+                // Fetch unread messages. We pull ALL unseen to prevent the server from choking 
+                // on complex IMAP SEARCH queries when unseen emails pile up.
+                var uids = await inbox.SearchAsync(SearchQuery.NotSeen, stoppingToken);
 
                 if (uids.Any())
                 {
-                    _logger.LogInformation("Found {Count} unread email(s) passing primary filter.", uids.Count);
+                    _logger.LogInformation("Found {Count} unread email(s). Processing and filtering...", uids.Count);
 
                     var summaries = await inbox.FetchAsync(uids, MessageSummaryItems.Envelope | MessageSummaryItems.UniqueId | MessageSummaryItems.References, stoppingToken);
 
@@ -104,13 +99,24 @@ public class ImapListeningService : BackgroundService
                             continue;
                         }
 
+                        // Local Primary Filter: Check Headers and Subject
+                        string headerMatch = summary.Envelope.InReplyTo ?? string.Empty;
+                        bool isHeaderMatch = headerMatch.Contains("@commhub.local") || (summary.References != null && summary.References.Any(r => r.Contains("@commhub.local")));
+                        bool isSubjectMatch = summary.Envelope.Subject != null && summary.Envelope.Subject.Contains("Claim #", StringComparison.OrdinalIgnoreCase);
+
+                        if (!isHeaderMatch && !isSubjectMatch)
+                        {
+                            _logger.LogInformation("Discarding email from {From}: Did not match primary claim filters.", fromAddress);
+                            await inbox.AddFlagsAsync(summary.UniqueId, MessageFlags.Seen, true, stoppingToken);
+                            continue;
+                        }
+
                         InvolvedParty? targetParty = null;
                         int? resolvedClaimId = null;
                         int? resolvedPartyId = null;
 
                         // 1. Check headers: If In-Reply-To exists -> Get ClaimId/PartyId directly
-                        string headerMatch = summary.Envelope.InReplyTo ?? string.Empty;
-                        if (!string.IsNullOrEmpty(headerMatch) && headerMatch.Contains("@commhub.local"))
+                        if (isHeaderMatch && !string.IsNullOrEmpty(headerMatch))
                         {
                             var parts = headerMatch.Trim('<', '>').Split('-');
                             if (parts.Length >= 2 && int.TryParse(parts[0], out int cid) && int.TryParse(parts[1], out int pid))
@@ -242,6 +248,17 @@ public class ImapListeningService : BackgroundService
 
         context.Communications.Add(communication);
         await context.SaveChangesAsync(cancellationToken);
+
+        // Trigger Auto-Reply if Adjuster is Inactive (Background task)
+        try
+        {
+            var autoReplyService = _serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IAutoReplyService>();
+            _ = Task.Run(() => autoReplyService.TriggerAutoReplyIfInactiveAsync(claimId, partyId, "Email"), cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to resolve ICommunicationService for auto-reply in IMAP service.");
+        }
 
         // Process attachments
         var attachments = message.BodyParts.OfType<MimePart>().Where(part =>

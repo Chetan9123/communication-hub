@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using CommunicationHub.API.DTOs;
 
 namespace CommunicationHub.API.Controllers;
 
@@ -72,12 +73,70 @@ public class AttachmentsController : ControllerBase
     }
 
     /// <summary>
+    /// GET /api/attachments/{attachmentId}/download
+    /// Streams the file from S3 through the backend to the client.
+    /// This avoids CORS issues that occur when the browser directly fetches S3 URLs.
+    /// </summary>
+    [HttpGet("{attachmentId}/download")]
+    public async Task<IActionResult> DownloadAttachment(Guid attachmentId)
+    {
+        try
+        {
+            var attachment = await _context.MessageAttachments
+                .FirstOrDefaultAsync(a => a.AttachmentId == attachmentId);
+
+            if (attachment == null)
+                return NotFound("Attachment not found.");
+
+            string downloadUrl;
+
+            if (!string.IsNullOrEmpty(attachment.S3Key))
+            {
+                // Generate a fresh pre-signed URL (1 hour), then stream through backend
+                downloadUrl = await _s3Service.GeneratePreSignedUrlAsync(attachment.S3Key, 60);
+            }
+            else if (!string.IsNullOrEmpty(attachment.FileUrl))
+            {
+                downloadUrl = attachment.FileUrl;
+            }
+            else
+            {
+                return BadRequest("Attachment is missing storage information.");
+            }
+
+            // Fetch the file from S3 and stream it directly to the response
+            using var httpClient = new System.Net.Http.HttpClient();
+            var response = await httpClient.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("S3 download failed with status {Status} for attachment {Id}", response.StatusCode, attachmentId);
+                return StatusCode((int)response.StatusCode, $"Failed to retrieve file from storage: {response.ReasonPhrase}");
+            }
+
+            var contentType = attachment.MimeType ?? response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
+            var fileName = attachment.FileName ?? $"attachment_{attachmentId}";
+            var stream = await response.Content.ReadAsStreamAsync();
+
+            return File(stream, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error streaming download for attachment {AttachmentId}", attachmentId);
+            return StatusCode(500, "Internal server error while downloading attachment.");
+        }
+    }
+
+
+    /// <summary>
     /// POST /api/attachments/upload
     /// Uploads a file to S3 and returns the metadata.
     /// This is used for attaching files to outgoing communications.
     /// </summary>
     [HttpPost("upload")]
-    public async Task<IActionResult> UploadAttachment([FromForm] IFormFile file)
+    [ProducesResponseType(typeof(AttachmentUploadResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<AttachmentUploadResponse>> UploadAttachment([FromForm] IFormFile file)
     {
         _logger.LogInformation("[AttachmentsController] Upload request received for file: {FileName}, ContentType: {ContentType}, Size: {Size} bytes", 
             file?.FileName, file?.ContentType, file?.Length);
@@ -139,11 +198,11 @@ public class AttachmentsController : ControllerBase
 
             _logger.LogInformation("Successfully uploaded and tracked attachment: {AttachmentId}", attachment.AttachmentId);
 
-            return Ok(new 
+            return Ok(new AttachmentUploadResponse
             { 
-                attachmentId = attachment.AttachmentId, 
-                fileName = attachment.FileName,
-                s3Key = attachment.S3Key
+                AttachmentId = attachment.AttachmentId, 
+                FileName = attachment.FileName,
+                S3Key = attachment.S3Key
             });
         }
         catch (Amazon.S3.AmazonS3Exception s3Ex)

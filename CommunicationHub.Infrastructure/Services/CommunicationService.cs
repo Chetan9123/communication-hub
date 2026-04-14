@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Twilio;
+using Twilio.Rest.Api.V2010.Account;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -28,6 +30,7 @@ public class CommunicationService : ICommunicationService
     private readonly IS3Service _s3Service;
     private readonly IHubContext<MessagingHub> _hubContext;
     private readonly IConfiguration _configuration;
+    private readonly IAutoReplyService _autoReplyService;
     private readonly ILogger<CommunicationService> _logger;
 
     public CommunicationService(
@@ -39,6 +42,7 @@ public class CommunicationService : ICommunicationService
         IS3Service s3Service,
         IHubContext<MessagingHub> hubContext,
         IConfiguration configuration,
+        IAutoReplyService autoReplyService,
         ILogger<CommunicationService> logger)
     {
         _context = context;
@@ -49,6 +53,7 @@ public class CommunicationService : ICommunicationService
         _s3Service = s3Service;
         _hubContext = hubContext;
         _configuration = configuration;
+        _autoReplyService = autoReplyService;
         _logger = logger;
     }
 
@@ -59,6 +64,7 @@ public class CommunicationService : ICommunicationService
             .Include(c => c.Claim)
             .Include(c => c.Party)
             .Include(c => c.Channel)
+            .Include(c => c.MessageAttachments)
             .OrderByDescending(c => c.ReceivedAt)
             .ToListAsync();
 
@@ -74,7 +80,15 @@ public class CommunicationService : ICommunicationService
             MessagePreview = TruncateMessage(m.MessageBody, 100),
             ReceivedAt = m.ReceivedAt,
             IsRead = m.ReadAt.HasValue && m.ReadAt.Value,
-            Status = m.Status
+            Status = m.Status,
+            Attachments = m.MessageAttachments.Select(a => new AttachmentDto
+            {
+                AttachmentId = a.AttachmentId,
+                FileUrl = a.FileUrl,
+                MimeType = a.MimeType,
+                FileSize = a.FileSize,
+                FileName = a.FileName
+            }).ToList()
         }).ToList();
     }
 
@@ -136,7 +150,7 @@ public class CommunicationService : ICommunicationService
                 MessageBody = m.MessageBody,
                 Status = m.Status,
                 IsRead = m.ReadAt.HasValue && m.ReadAt.Value,
-                Notes = null,
+                Notes = m.Notes,
                 Attachments = m.MessageAttachments.Select(a => new AttachmentDto
                 {
                     AttachmentId = a.AttachmentId,
@@ -150,8 +164,14 @@ public class CommunicationService : ICommunicationService
 
     public async Task<bool> UpdateNotesAsync(Guid communicationId, string notes)
     {
-        // The current database schema does not have a Notes column; gracefully return.
-        return await Task.FromResult(false);
+        var communication = await _context.Communications.FindAsync(communicationId);
+        if (communication == null)
+            return false;
+
+        communication.Notes = notes;
+        _context.Communications.Update(communication);
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     public async Task<(Guid CommunicationId, string? WarningMessage)> SendCommunicationAsync(SendCommunicationRequest request, int adjusterId)
@@ -636,6 +656,13 @@ public class CommunicationService : ICommunicationService
                     ts = communication.ReceivedAt
                 });
             }
+            
+            // 6. Trigger Auto-Reply if Adjuster is Inactive
+            if (claimId.HasValue && partyId.HasValue)
+            {
+                // Background execution to not block the webhook response
+                _ = Task.Run(() => _autoReplyService.TriggerAutoReplyIfInactiveAsync(claimId.Value, partyId.Value, mode));
+            }
 
             _logger.LogInformation("[Webhook] {Mode} stored and broadcasted. CommunicationId: {Id}", 
                 mode, communication.CommunicationId);
@@ -674,6 +701,76 @@ public class CommunicationService : ICommunicationService
 
         return true;
     }
+
+    public async Task<int> SyncMissedTwilioMessagesAsync()
+    {
+        int processedCount = 0;
+        try
+        {
+            var accountSid = _configuration["Twilio:AccountSid"];
+            var authToken = _configuration["Twilio:AuthToken"];
+            var targetNumber = _configuration["Twilio:WhatsAppNumber"];
+
+            if (string.IsNullOrEmpty(accountSid) || string.IsNullOrEmpty(authToken) || string.IsNullOrEmpty(targetNumber))
+            {
+                _logger.LogWarning("[Sync] Missing Twilio configuration. Cannot sync messages.");
+                return 0;
+            }
+
+            TwilioClient.Init(accountSid, authToken);
+
+            _logger.LogInformation("[Sync] Fetching Twilio WhatsApp messages for the last 24 hours...");
+
+            var messages = await MessageResource.ReadAsync(
+                to: new Twilio.Types.PhoneNumber(targetNumber),
+                dateSentAfter: DateTime.UtcNow.AddHours(-24),
+                limit: 100
+            );
+
+            foreach (var message in messages)
+            {
+                if (message.Direction != MessageResource.DirectionEnum.Inbound)
+                    continue;
+
+                bool exists = await _context.Communications.AnyAsync(c => c.Sid == message.Sid);
+                if (exists)
+                    continue;
+
+                _logger.LogInformation("[Sync] Found missing message {Sid}. Processing now...", message.Sid);
+
+                var mediaUrls = new List<string>();
+                if (int.TryParse(message.NumMedia, out int numMedia) && numMedia > 0)
+                {
+                    var mediaList = await Twilio.Rest.Api.V2010.Account.Message.MediaResource.ReadAsync(pathMessageSid: message.Sid);
+                    foreach (var media in mediaList)
+                    {
+                        var fullUrl = media.Uri.StartsWith("http") ? media.Uri : $"https://api.twilio.com{media.Uri}";
+                        fullUrl = fullUrl.Replace(".json", "");
+                        mediaUrls.Add(fullUrl);
+                    }
+                }
+
+                bool success = await ProcessIncomingWhatsAppAsync(
+                    fromNumber: message.From.ToString(),
+                    body: message.Body,
+                    messageSid: message.Sid,
+                    mediaUrls: mediaUrls
+                );
+
+                if (success)
+                    processedCount++;
+            }
+
+            _logger.LogInformation("[Sync] Successfully synced {Count} missed WhatsApp messages.", processedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[Sync] Error occurred while syncing missed Twilio messages.");
+        }
+
+        return processedCount;
+    }
+
 
     public async Task<bool> ValidateAdjusterAccessAsync(int adjusterId, int claimId)
     {

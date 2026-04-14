@@ -107,4 +107,14 @@ TESTING_UI_FLOW.md
 tmp
 app_log.txt
 log.txt
-GetRegion.csGetRegion.cs
+GetRegion.cs
+build_output.txt
+build_errors.txt
+addColumn.txt
+addColumn.ps1
+build_errors.txt
+communication-hub-ui/src/environmet.ts
+GetRegion.cs
+test.jpeg
+build_output.txt
+build_errors.txt

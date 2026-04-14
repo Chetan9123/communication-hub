@@ -2,12 +2,13 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
-import { CommunicationService, UnreadCommunicationDto, UpdateReadStatusRequest } from '../../services/communication.service';
+import { CommunicationService, UnreadCommunicationDto } from '../../services/communication.service';
+import { AttachmentViewerComponent } from '../attachment-viewer/attachment-viewer.component';
 
 @Component({
   selector: 'app-communication-hub',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule],
+  imports: [CommonModule, FormsModule, RouterModule, AttachmentViewerComponent],
   templateUrl: './communication-hub.component.html',
   styleUrls: ['./communication-hub.component.scss']
 })
@@ -97,8 +98,7 @@ export class CommunicationHubComponent implements OnInit {
 
   toggleReadStatus(communication: UnreadCommunicationDto, event: Event): void {
     event.stopPropagation();
-    const request: UpdateReadStatusRequest = { isRead: !communication.isRead };
-    this.communicationService.updateReadStatus(communication.communicationId, request).subscribe({
+    this.communicationService.updateReadStatus(communication.communicationId, !communication.isRead).subscribe({
       next: () => {
         communication.isRead = !communication.isRead;
         if (communication.isRead) {
@@ -114,14 +114,13 @@ export class CommunicationHubComponent implements OnInit {
 
   openClaimThread(communication: UnreadCommunicationDto): void {
     this.closePreviewModal();
-    const request: UpdateReadStatusRequest = { isRead: true };
-    this.communicationService.updateReadStatus(communication.communicationId, request).subscribe({
+    this.communicationService.updateReadStatus(communication.communicationId, true).subscribe({
       next: () => {
-        this.router.navigate(['/claim', communication.claimId, 'party', communication.partyId]);
+        this.router.navigate(['/claims', communication.claimId, 'details', 'party', communication.partyId]);
       },
       error: (err) => {
         console.error('Error marking as read:', err);
-        this.router.navigate(['/claim', communication.claimId, 'party', communication.partyId]);
+        this.router.navigate(['/claims', communication.claimId, 'details', 'party', communication.partyId]);
       }
     });
   }
