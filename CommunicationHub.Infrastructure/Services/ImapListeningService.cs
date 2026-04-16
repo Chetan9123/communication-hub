@@ -252,12 +252,19 @@ public class ImapListeningService : BackgroundService
         // Trigger Auto-Reply if Adjuster is Inactive (Background task)
         try
         {
-            var autoReplyService = _serviceProvider.CreateScope().ServiceProvider.GetRequiredService<IAutoReplyService>();
-            _ = Task.Run(() => autoReplyService.TriggerAutoReplyIfInactiveAsync(claimId, partyId, "Email"), cancellationToken);
+            _ = Task.Run(async () => {
+                try {
+                    using var scope = _serviceProvider.CreateScope();
+                    var autoReplyService = scope.ServiceProvider.GetRequiredService<IAutoReplyService>();
+                    await autoReplyService.TriggerAutoReplyIfInactiveAsync(claimId, partyId, "Email");
+                } catch (Exception ex) {
+                    _logger.LogError(ex, "Failed to run auto-reply background task in IMAP service.");
+                }
+            }, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to resolve ICommunicationService for auto-reply in IMAP service.");
+            _logger.LogError(ex, "Failed to dispatch auto-reply task in IMAP service.");
         }
 
         // Process attachments

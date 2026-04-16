@@ -41,46 +41,101 @@ public class AutoReplyService : IAutoReplyService
                 .Include(c => c.InvolvedParties)
                 .FirstOrDefaultAsync(c => c.ClaimId == claimId);
 
-            if (claim == null || claim.ClaimAdjuster?.Adjuster == null) return;
+            if (claim == null)
+            {
+                _logger.LogWarning("[AutoReply] Aborting: Claim {ClaimId} not found.", claimId);
+                return;
+            }
+
+            if (claim.ClaimAdjuster?.Adjuster == null)
+            {
+                _logger.LogWarning("[AutoReply] Aborting: No adjuster assigned to Claim {ClaimId}.", claimId);
+                return;
+            }
 
             var adjuster = claim.ClaimAdjuster.Adjuster;
             var party = claim.InvolvedParties.FirstOrDefault(p => p.PartyId == partyId);
 
-            // Cooldown logic: Send only if adjuster is inactive and no auto-reply sent in the last 6 hours
-            // Normalized check for IsActive being explicitly false (Out of Office)
-            if (adjuster.IsActive == false && (!claim.LastAutoReplySent.HasValue || (DateTime.UtcNow - claim.LastAutoReplySent.Value).TotalHours >= 6))
+            if (party == null)
             {
-                _logger.LogInformation("[AutoReply] Triggered for ClaimId {ClaimId}, PartyId {PartyId} via {Channel}", claimId, partyId, channelName);
+                _logger.LogWarning("[AutoReply] Aborting: Party {PartyId} not found in Claim {ClaimId}.", partyId, claimId);
+                return;
+            }
 
-                var messageBody = "The assigned adjuster is currently unavailable (Out of Office). We will get back to you shortly.";
+            // check if adjuster is active
+            if (adjuster.IsActive != false)
+            {
+                _logger.LogInformation("[AutoReply] Skipping: Adjuster {AdjusterId} is currently Active.", adjuster.AdjusterId);
+                return;
+            }
 
-                bool success = false;
-                if (channelName == "Email" && !string.IsNullOrEmpty(party?.Email))
+            // Cooldown logic: Send only if no auto-reply sent in the last 1 hour
+            if (claim.LastAutoReplySent.HasValue && (DateTime.UtcNow - claim.LastAutoReplySent.Value).TotalHours < 1)
+            {
+                _logger.LogInformation("[AutoReply] Skipping: Cooldown active. Last reply sent at {Time}.", claim.LastAutoReplySent.Value);
+                return;
+            }
+
+            _logger.LogInformation("[AutoReply] Triggering for Claim {ClaimId}, Party {PartyId} via {Channel}", claimId, partyId, channelName);
+
+            var messageBody = "The assigned adjuster is currently unavailable (Out of Office). We will get back to you shortly.";
+            bool success = false;
+
+            if (string.Equals(channelName, "Email", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrEmpty(party.Email))
                 {
                     var result = await _emailService.SendEmailAsync(claimId, partyId, party.Email, $"Re: Claim #{claim.ClaimNumber} - Automated Reply", messageBody, adjuster.AdjusterId);
                     success = result.Sent;
                 }
-                else if (channelName == "SMS" && !string.IsNullOrEmpty(party?.Phone))
+                else
+                {
+                    _logger.LogWarning("[AutoReply] Cannot send Email: Party {PartyId} has no email address.", partyId);
+                }
+            }
+            else if (string.Equals(channelName, "SMS", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrEmpty(party.Phone))
                 {
                     success = await _smsService.SendSmsAsync(party.Phone, messageBody);
                 }
-                else if (channelName == "WhatsApp" && !string.IsNullOrEmpty(party?.Phone))
+                else
+                {
+                    _logger.LogWarning("[AutoReply] Cannot send SMS: Party {PartyId} has no phone number.", partyId);
+                }
+            }
+            else if (string.Equals(channelName, "WhatsApp", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!string.IsNullOrEmpty(party.Phone))
                 {
                     var result = await _whatsAppService.SendWhatsAppAsync(party.Phone, messageBody, null, null);
                     success = result.Success;
                 }
-
-                if (success)
+                else
                 {
-                    claim.LastAutoReplySent = DateTime.UtcNow;
-                    _context.Claims.Update(claim);
-                    await _context.SaveChangesAsync();
+                    _logger.LogWarning("[AutoReply] Cannot send WhatsApp: Party {PartyId} has no phone number.", partyId);
                 }
+            }
+            else
+            {
+                _logger.LogWarning("[AutoReply] Unsupported channel: {Channel}", channelName);
+            }
+
+            if (success)
+            {
+                claim.LastAutoReplySent = DateTime.UtcNow;
+                _context.Claims.Update(claim);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("[AutoReply] Successfully sent and timestamp updated for Claim {ClaimId}.", claimId);
+            }
+            else
+            {
+                _logger.LogError("[AutoReply] Technical failure while sending message via {Channel}.", channelName);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[AutoReply] Failed to trigger auto-reply for ClaimId {ClaimId}", claimId);
+            _logger.LogError(ex, "[AutoReply] Critical exception for Claim {ClaimId}", claimId);
         }
     }
 }

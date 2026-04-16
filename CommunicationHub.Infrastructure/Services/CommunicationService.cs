@@ -17,6 +17,7 @@ using Twilio.Rest.Api.V2010.Account;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CommunicationHub.Infrastructure.Services;
 
@@ -31,6 +32,7 @@ public class CommunicationService : ICommunicationService
     private readonly IHubContext<MessagingHub> _hubContext;
     private readonly IConfiguration _configuration;
     private readonly IAutoReplyService _autoReplyService;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<CommunicationService> _logger;
 
     public CommunicationService(
@@ -43,6 +45,7 @@ public class CommunicationService : ICommunicationService
         IHubContext<MessagingHub> hubContext,
         IConfiguration configuration,
         IAutoReplyService autoReplyService,
+        IServiceScopeFactory scopeFactory,
         ILogger<CommunicationService> logger)
     {
         _context = context;
@@ -54,6 +57,7 @@ public class CommunicationService : ICommunicationService
         _hubContext = hubContext;
         _configuration = configuration;
         _autoReplyService = autoReplyService;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -712,8 +716,16 @@ public class CommunicationService : ICommunicationService
             // 6. Trigger Auto-Reply if Adjuster is Inactive
             if (claimId.HasValue && partyId.HasValue)
             {
-                // Background execution to not block the webhook response
-                _ = Task.Run(() => _autoReplyService.TriggerAutoReplyIfInactiveAsync(claimId.Value, partyId.Value, mode));
+                // Background execution with its own scope to prevent context disposal issues
+                _ = Task.Run(async () => {
+                    try {
+                        using var scope = _scopeFactory.CreateScope();
+                        var scopedAutoReplyService = scope.ServiceProvider.GetRequiredService<IAutoReplyService>();
+                        await scopedAutoReplyService.TriggerAutoReplyIfInactiveAsync(claimId.Value, partyId.Value, mode);
+                    } catch (Exception ex) {
+                        _logger.LogError(ex, "[AutoReply] Background task failed for Claim {ClaimId}", claimId);
+                    }
+                });
             }
 
             _logger.LogInformation("[Webhook] {Mode} stored and broadcasted. CommunicationId: {Id}", 
