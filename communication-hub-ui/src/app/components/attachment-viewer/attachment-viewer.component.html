@@ -1,8 +1,11 @@
 <div class="attachments-container mt-2" *ngIf="attachments && attachments.length > 0">
   <div class="attachment-cards">
     <div *ngFor="let att of attachments" class="attachment-card" (click)="openPreview(att, $event)" title="{{ getFallbackName(att) }}">
-      <div class="attachment-icon">
+      <div class="attachment-icon" *ngIf="!att.attachmentId || !attachmentUrls[att.attachmentId]">
         <i class="fa fa-fw" [ngClass]="getFileIcon(att.mimeType)"></i>
+      </div>
+      <div class="attachment-icon inline-preview" *ngIf="att.attachmentId && attachmentUrls[att.attachmentId]" style="background: transparent; overflow: hidden; padding: 0;">
+        <img [src]="attachmentUrls[att.attachmentId]" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px;">
       </div>
       <div class="attachment-details">
         <div class="attachment-name">{{ getFallbackName(att) }}</div>

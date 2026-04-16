@@ -1,4 +1,4 @@
-import { Component, Input, ViewChild } from '@angular/core';
+import { Component, Input, ViewChild, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { AttachmentDto } from '../../api/models/attachment-dto';
@@ -14,8 +14,9 @@ import { AuthService } from '../../services/auth.service';
   templateUrl: './attachment-viewer.component.html',
   styleUrls: ['./attachment-viewer.component.scss']
 })
-export class AttachmentViewerComponent {
+export class AttachmentViewerComponent implements OnInit {
   @Input() attachments: AttachmentDto[] = [];
+  public attachmentUrls: { [id: string]: SafeResourceUrl } = {};
   
   @ViewChild('previewDialog') public previewDialog!: DialogComponent;
 
@@ -28,6 +29,22 @@ export class AttachmentViewerComponent {
   } = { attachment: null, url: null, type: null, error: null };
 
   constructor(private api: Api, private sanitizer: DomSanitizer, private authService: AuthService) {}
+
+  async ngOnInit() {
+    // Automatically fetch presigned URLs for image previews
+    if (this.attachments) {
+      for (const att of this.attachments) {
+        if (this.getFileType(att.mimeType) === 'image' && att.attachmentId) {
+          try {
+            const url = await this.fetchPresignedUrl(att.attachmentId);
+            this.attachmentUrls[att.attachmentId] = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+          } catch (e) {
+            console.error('Failed to load inline preview', e);
+          }
+        }
+      }
+    }
+  }
 
   public getFileIcon(mimeType: string | null | undefined): string {
     if (!mimeType) return 'fa-paperclip';

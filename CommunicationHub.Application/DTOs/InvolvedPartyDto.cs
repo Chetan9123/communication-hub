@@ -12,4 +12,5 @@ public class InvolvedPartyDto
     public string? Email { get; set; }
     public string? InvolvedPartyType { get; set; }
     public bool? IsActive { get; set; }
+    public bool? IsInjured { get; set; }
 }

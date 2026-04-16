@@ -70,7 +70,8 @@ public class ClaimService : IClaimService
                     Phone = p.Phone,
                     Email = p.Email,
                     InvolvedPartyType = p.InvolvedPartyType,
-                    IsActive = p.IsActive
+                    IsActive = p.IsActive,
+                    IsInjured = p.IsInjured
                 })
                 .ToList()
         };
@@ -88,10 +89,56 @@ public class ClaimService : IClaimService
                 Phone = p.Phone,
                 Email = p.Email,
                 InvolvedPartyType = p.InvolvedPartyType,
-                IsActive = p.IsActive
+                IsActive = p.IsActive,
+                IsInjured = p.IsInjured
             })
             .ToListAsync();
 
         return parties;
+    }
+
+    public async Task<bool> DeleteInvolvedPartyAsync(int partyId)
+    {
+        var party = await _context.InvolvedParties.FindAsync(partyId);
+        if (party == null) return false;
+
+        party.IsActive = false;
+        _context.InvolvedParties.Update(party);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> UpdateInvolvedPartyAsync(int partyId, InvolvedPartyDto dto)
+    {
+        var party = await _context.InvolvedParties.FindAsync(partyId);
+        if (party == null) return false;
+
+        party.InvolvedPartyType = dto.InvolvedPartyType;
+        party.Email = dto.Email;
+        party.Phone = dto.Phone;
+        party.IsInjured = dto.IsInjured;
+
+        _context.InvolvedParties.Update(party);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<int> AddInvolvedPartyAsync(int claimId, InvolvedPartyDto dto)
+    {
+        var party = new CommunicationHub.Domain.Entities.InvolvedParty
+        {
+            ClaimId = claimId,
+            FirstName = dto.FirstName,
+            LastName = dto.LastName,
+            Email = dto.Email,
+            Phone = dto.Phone,
+            InvolvedPartyType = dto.InvolvedPartyType,
+            IsActive = true,
+            IsInjured = dto.IsInjured ?? false
+        };
+
+        _context.InvolvedParties.Add(party);
+        await _context.SaveChangesAsync();
+        return party.PartyId;
     }
 }

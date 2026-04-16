@@ -43,6 +43,8 @@ export interface UnreadCommunicationDto {
   receivedAt: Date;
   isRead: boolean;
   status: string;
+  senderPhone?: string;
+  senderEmail?: string;
   attachments: AttachmentDto[];
 }
 

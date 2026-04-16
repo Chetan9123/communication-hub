@@ -20,6 +20,7 @@ public partial class InvolvedParty
     public string? InvolvedPartyType { get; set; }
 
     public bool? IsActive { get; set; }
+    public bool? IsInjured { get; set; }
 
     public virtual Claim? Claim { get; set; }
 

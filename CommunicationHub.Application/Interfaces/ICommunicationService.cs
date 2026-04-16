@@ -23,6 +23,11 @@ public interface ICommunicationService
     Task<CommunicationThreadDto> GetCommunicationThreadAsync(int claimId, int partyId);
 
     /// <summary>
+    /// Gets all communications across all involved parties for a specific claim
+    /// </summary>
+    Task<CommunicationThreadDto> GetClaimCommunicationThreadAsync(int claimId);
+
+    /// <summary>
     /// Updates the notes for a specific communication
     /// </summary>
     Task<bool> UpdateNotesAsync(Guid communicationId, string notes);

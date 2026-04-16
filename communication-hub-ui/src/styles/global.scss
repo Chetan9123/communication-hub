@@ -186,3 +186,72 @@ h1, h2, h3, h4, h5, h6 {
 .badge-green { background: #dcfce7; color: #15803d; }
 .badge-warning { background: #fef3c7; color: #b45309; }
 .badge-danger { background: #fee2e2; color: #b91c1c; }
+
+/* ==========================================
+   COMMUNICATION HUB COMPONENTS
+   ========================================== */
+
+.direction-arrow {
+  font-weight: 900 !important;
+  font-size: 1.4rem;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+  text-shadow: 0 0 1px currentColor;
+  transform: translateY(1px);
+}
+
+/* ==========================================
+   PREMIUM UI UTILITIES
+   ========================================== */
+
+/* Host stretch to prevent "squeezy" layouts */
+app-adjuster-dashboard, 
+app-communication-hub, 
+app-claim-details,
+app-claim-history {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+}
+
+.pill-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--background-alt);
+  padding: 6px;
+  border-radius: 14px;
+  width: fit-content;
+  border: 1px solid var(--border-color);
+}
+
+.pill-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .icon { font-size: 1.1rem; filter: grayscale(1); opacity: 0.7; transition: all 0.2s; }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: var(--text-main);
+  }
+
+  &.active {
+    background: var(--surface);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+    
+    .icon { filter: none; opacity: 1; }
+  }
+}

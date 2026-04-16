@@ -21,4 +21,19 @@ public interface IClaimService
     /// Gets involved parties for a specific claim
     /// </summary>
     Task<List<InvolvedPartyDto>> GetInvolvedPartiesAsync(int claimId);
+
+    /// <summary>
+    /// Deletes an involved party
+    /// </summary>
+    Task<bool> DeleteInvolvedPartyAsync(int partyId);
+
+    /// <summary>
+    /// Updates an involved party's details
+    /// </summary>
+    Task<bool> UpdateInvolvedPartyAsync(int partyId, InvolvedPartyDto dto);
+
+    /// <summary>
+    /// Adds a new involved party to a claim
+    /// </summary>
+    Task<int> AddInvolvedPartyAsync(int claimId, InvolvedPartyDto dto);
 }

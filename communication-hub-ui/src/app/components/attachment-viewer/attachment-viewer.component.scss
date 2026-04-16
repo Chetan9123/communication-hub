@@ -22,8 +22,8 @@
   position: relative;
 
   &:hover {
-    background-color: #ffffff;
-    border-color: #cbd5e1;
+    background-color: var(--surface);
+    border-color: var(--border-color);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 
     .attachment-actions {
@@ -70,7 +70,7 @@
     right: 8px;
     top: 50%;
     transform: translateY(-50%);
-    opacity: 0;
+    opacity: 1; /* Made always visible per user request */
     transition: opacity 0.2s ease;
 
     .dl-btn {

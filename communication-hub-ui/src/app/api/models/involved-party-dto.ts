@@ -10,4 +10,5 @@ export interface InvolvedPartyDto {
   lastName?: (string | null);
   partyId?: (number | string);
   phone?: (string | null);
+  isInjured?: (boolean | null);
 }

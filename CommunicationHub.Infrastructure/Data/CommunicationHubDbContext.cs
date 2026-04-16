@@ -46,7 +46,7 @@ public partial class CommunicationHubDbContext : DbContext
             entity.ToTable("Adjuster");
             entity.HasKey(e => e.AdjusterId).HasName("PK__Adjuster__C81DA416CE19FCC2");
 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
         });
 
         modelBuilder.Entity<Channel>(entity =>
@@ -66,7 +66,7 @@ public partial class CommunicationHubDbContext : DbContext
             entity.ToTable("Claim");
             entity.HasKey(e => e.ClaimId).HasName("PK__Claim__EF2E139B262E360E");
 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
         });
 
         modelBuilder.Entity<ClaimAdjuster>(entity =>
@@ -97,7 +97,7 @@ public partial class CommunicationHubDbContext : DbContext
                 .HasFilter("([IsActive]=(1))");
 
             entity.Property(e => e.CommunicationId).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.Sid).HasMaxLength(100);
 
             entity.HasOne(d => d.Adjuster).WithMany(p => p.Communications).HasConstraintName("FK__Communica__Adjus__5DCAEF64");
@@ -125,12 +125,36 @@ public partial class CommunicationHubDbContext : DbContext
             entity.HasIndex(e => e.CommunicationId, "IX_MessageAttachment_CommunicationId");
 
             entity.Property(e => e.AttachmentId).HasDefaultValueSql("(newid())");
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getutcdate())");
             entity.Property(e => e.S3Key).HasMaxLength(500);
             entity.Property(e => e.FileName).HasMaxLength(255);
 
             entity.HasOne(d => d.Communication).WithMany(p => p.MessageAttachments).HasConstraintName("FK__MessageAt__Commu__628FA481");
         });
+
+        // Use UTC for all DateTime properties
+        var dateTimeConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime, DateTime>(
+            v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
+            v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+        var nullableDateTimeConverter = new Microsoft.EntityFrameworkCore.Storage.ValueConversion.ValueConverter<DateTime?, DateTime?>(
+            v => !v.HasValue ? v : (v.Value.Kind == DateTimeKind.Utc ? v : v.Value.ToUniversalTime()),
+            v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                {
+                    property.SetValueConverter(dateTimeConverter);
+                }
+                else if (property.ClrType == typeof(DateTime?))
+                {
+                    property.SetValueConverter(nullableDateTimeConverter);
+                }
+            }
+        }
 
         OnModelCreatingPartial(modelBuilder);
     }

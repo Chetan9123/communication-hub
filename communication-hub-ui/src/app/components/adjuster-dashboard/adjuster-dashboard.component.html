@@ -17,24 +17,14 @@
     </div>
   </div>
 
-  <div class="stats-row">
-    <div class="card stat-card">
-      <div class="flex items-center gap-4">
-        <div class="icon-circle bg-blue"><i class="e-icons e-folder"></i></div>
-        <div>
-          <div class="stat-value">{{ claims.length }}</div>
-          <div class="stat-label">Total Claims</div>
-        </div>
-      </div>
-    </div>
-    <!-- Add more stats if needed -->
-  </div>
+  <!-- Stats row removed as per user request -->
+
 
   <div class="grid-section">
     <ejs-grid #grid [dataSource]="claims" [allowPaging]="true" [pageSettings]="pageSettings"
       [allowSorting]="true" [allowFiltering]="true" [filterSettings]="filterSettings"
       [allowExcelExport]="true" [allowPdfExport]="true" [toolbar]="toolbarOptions"
-      (toolbarClick)="onToolbarClick($event)" (rowSelected)="onRowSelected($event)">
+      (toolbarClick)="onToolbarClick($event)">
       <e-columns>
         <e-column field="claimNumber" headerText="Claim #" width="150" isPrimaryKey="true">
           <ng-template #template let-data>
@@ -53,14 +43,20 @@
         </e-column>
         <e-column field="unreadCommunicationCount" headerText="Unread" width="100" textAlign="Center">
           <ng-template #template let-data>
-            <span *ngIf="data.unreadCommunicationCount > 0" class="badge badge-danger">{{ data.unreadCommunicationCount }}</span>
-            <span *ngIf="!data.unreadCommunicationCount || data.unreadCommunicationCount === 0" class="text-muted">—</span>
+            <span *ngIf="+data.unreadCommunicationCount > 0" class="badge badge-danger">{{ data.unreadCommunicationCount }}</span>
+            <span *ngIf="!data.unreadCommunicationCount || +data.unreadCommunicationCount === 0" class="text-muted">—</span>
           </ng-template>
         </e-column>
         <e-column field="claimFiledOn" headerText="Filed On" width="150" type="date" format="MMM dd, yyyy"></e-column>
-        <e-column headerText="Actions" width="160" textAlign="Center">
+        <e-column headerText="Actions" width="220" textAlign="Center">
           <ng-template #template let-data>
-            <button ejs-button [isPrimary]="true" (click)="openClaim(data.claimId)">Open Claim Hub</button>
+            <div class="flex gap-2 justify-center">
+              <button ejs-button [isPrimary]="true" (click)="openClaim(data.claimId)">Details</button>
+              <button ejs-button [isPrimary]="false" cssClass="e-outline e-info" 
+                      (click)="openHistory(data.claimId)" title="Full History">
+                <span class="e-btn-icon e-icons e-comment-show"></span>
+              </button>
+            </div>
           </ng-template>
         </e-column>
       </e-columns>

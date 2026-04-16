@@ -1,12 +1,15 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { TabModule, TabComponent } from '@syncfusion/ej2-angular-navigations';
 import { ButtonModule } from '@syncfusion/ej2-angular-buttons';
+import { GridModule, SortService, FilterService, ToolbarService } from '@syncfusion/ej2-angular-grids';
 import { Api } from '../../api/api';
 import { apiClaimsClaimIdGet$Json } from '../../api/fn/claims/api-claims-claim-id-get-json';
 import { apiCommunicationsClaimClaimIdPartyPartyIdGet$Json } from '../../api/fn/communications/api-communications-claim-claim-id-party-party-id-get-json';
+import { apiCommunicationsClaimClaimIdAllGet$Json } from '../../api/fn/communications/api-communications-claim-claim-id-all-get-json';
 import { apiCommunicationsCommIdNotesPut$Json } from '../../api/fn/communications/api-communications-comm-id-notes-put-json';
 import { apiAttachmentsAttachmentIdUrlGet } from '../../api/fn/attachments/api-attachments-attachment-id-url-get';
 import { ClaimDetailsDto, InvolvedPartyDto, CommunicationMessageDto, CommunicationThreadDto } from '../../api/models';
@@ -15,15 +18,17 @@ import { SmsDialogComponent } from '../sms-dialog/sms-dialog.component';
 import { EmailDialogComponent } from '../email-dialog/email-dialog.component';
 import { WhatsAppDialogComponent } from '../whatsapp-dialog/whatsapp-dialog.component';
 import { AttachmentViewerComponent } from '../attachment-viewer/attachment-viewer.component';
+import { EditPartyDialogComponent } from '../edit-party-dialog/edit-party-dialog.component';
 
 @Component({
   selector: 'app-claim-details',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, RouterModule, TabModule, ButtonModule, 
+    CommonModule, FormsModule, RouterModule, TabModule, ButtonModule, GridModule,
     SmsDialogComponent, EmailDialogComponent, WhatsAppDialogComponent,
-    AttachmentViewerComponent
+    AttachmentViewerComponent, EditPartyDialogComponent
   ],
+  providers: [SortService, FilterService, ToolbarService],
   templateUrl: './claim-details.component.html',
   styleUrls: ['./claim-details.component.scss']
 })
@@ -31,6 +36,7 @@ export class ClaimDetailsComponent implements OnInit {
   @ViewChild('smsDialog') smsDialog!: SmsDialogComponent;
   @ViewChild('emailDialog') emailDialog!: EmailDialogComponent;
   @ViewChild('whatsappDialog') whatsappDialog!: WhatsAppDialogComponent;
+  @ViewChild('editPartyDialog') editPartyDialog!: EditPartyDialogComponent;
 
   public viewMode: 'parties' | 'history' = 'parties';
 
@@ -38,16 +44,24 @@ export class ClaimDetailsComponent implements OnInit {
   public claim: ClaimDetailsDto | null = null;
   public parties: InvolvedPartyDto[] = [];
   public messages: CommunicationMessageDto[] = [];
+  public allMessages: CommunicationMessageDto[] = [];
   public isLoading = false;
   public historyLoading = false;
   public selectedParty: InvolvedPartyDto | null = null;
   public activeTab: string = 'All';
   public tabs: string[] = ['All', 'Email', 'SMS', 'WhatsApp'];
+  public showChannelPicker: boolean = false;
+  public toolbarOptions: any[] = [
+    'Search',
+    { text: 'Add Involved Party', tooltipText: 'Add New', prefixIcon: 'e-add', id: 'Add' }
+  ];
+  public filterSettings = { type: 'Excel' };
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private api: Api,
+    private http: HttpClient,
     private toast: ToastService
   ) {}
 
@@ -58,7 +72,16 @@ export class ClaimDetailsComponent implements OnInit {
       
       if (id) {
         this.claimId = Number(id);
-        this.loadClaim(partyId ? Number(partyId) : undefined);
+        
+        // Listen to Query Params for deep-linking
+          if (partyId) {
+            // Priority 1: Deep link to specific party history via paramMap
+            this.loadClaim(Number(partyId));
+          } else {
+            // Default: Parties list
+            this.loadClaim();
+            this.viewMode = 'parties';
+          }
       }
     });
   }
@@ -89,20 +112,49 @@ export class ClaimDetailsComponent implements OnInit {
     this.messages = [];
   }
 
-  showHistory(party: InvolvedPartyDto) {
+  showHistory(party: InvolvedPartyDto, event?: Event) {
+    if (event) event.stopPropagation();
     this.selectedParty = party;
     this.viewMode = 'history';
+    this.activeTab = 'All';
     this.loadHistory(party.partyId as number);
   }
 
+  editParty(party: InvolvedPartyDto, event?: Event) {
+    if (event) event.stopPropagation();
+    this.editPartyDialog.show(party);
+  }
+
+  onToolbarClick(args: any) {
+    if (args.item.id === 'Add') {
+      this.editPartyDialog.show(null);
+    }
+  }
+
+  deleteParty(party: InvolvedPartyDto, event?: Event) {
+    if (event) event.stopPropagation();
+    
+    if (confirm(`Are you sure you want to remove ${party.firstName} ${party.lastName} from this claim?`)) {
+      const url = `${this.api.rootUrl}/api/Claims/parties/${party.partyId}`;
+      this.http.delete(url).subscribe({
+        next: () => {
+          this.parties = this.parties.filter(p => p.partyId !== party.partyId);
+          // Refresh claim details to update counts
+          this.loadClaim();
+          this.toast.success('Success', `${party.firstName} ${party.lastName} removed.`);
+        },
+        error: (err) => {
+          console.error('Delete failed:', err);
+          this.toast.error('Error', 'Could not delete the involved party.');
+        }
+      });
+    }
+  }
+
   get filteredMessages(): CommunicationMessageDto[] {
-    if (this.activeTab === 'All') return this.messages;
-    return this.messages.filter(m => {
-      if (this.activeTab === 'SMS') return m.mode === 'SMS';
-      if (this.activeTab === 'Email') return m.mode === 'Email';
-      if (this.activeTab === 'WhatsApp') return m.mode === 'WhatsApp';
-      return true;
-    });
+    const list = this.messages;
+    if (this.activeTab === 'All') return list;
+    return list.filter(m => m.mode === this.activeTab);
   }
 
   setActiveTab(tab: string) {
@@ -139,6 +191,14 @@ export class ClaimDetailsComponent implements OnInit {
     if (event) event.stopPropagation();
     this.selectedParty = party;
     setTimeout(() => this.whatsappDialog.show(), 0);
+  }
+
+  openChannelPicker() {
+    this.showChannelPicker = true;
+  }
+
+  closeChannelPicker() {
+    this.showChannelPicker = false;
   }
 
   onCommSent() {

@@ -4,11 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { CommunicationService, UnreadCommunicationDto } from '../../services/communication.service';
 import { AttachmentViewerComponent } from '../attachment-viewer/attachment-viewer.component';
+import { SmsDialogComponent } from '../sms-dialog/sms-dialog.component';
+import { EmailDialogComponent } from '../email-dialog/email-dialog.component';
+import { WhatsAppDialogComponent } from '../whatsapp-dialog/whatsapp-dialog.component';
+import { ViewChild } from '@angular/core';
+import { InvolvedPartyDto } from '../../api/models';
 
 @Component({
   selector: 'app-communication-hub',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, AttachmentViewerComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AttachmentViewerComponent, SmsDialogComponent, EmailDialogComponent, WhatsAppDialogComponent],
   templateUrl: './communication-hub.component.html',
   styleUrls: ['./communication-hub.component.scss']
 })
@@ -22,6 +27,12 @@ export class CommunicationHubComponent implements OnInit {
 
   showPreviewModal: boolean = false;
   selectedCommunication: UnreadCommunicationDto | null = null;
+
+  @ViewChild('smsDialog') smsDialog!: SmsDialogComponent;
+  @ViewChild('emailDialog') emailDialog!: EmailDialogComponent;
+  @ViewChild('whatsappDialog') whatsappDialog!: WhatsAppDialogComponent;
+  
+  selectedParty: InvolvedPartyDto | null = null;
 
   modeIcons: { [key: string]: string } = {
     'Email': '📧',
@@ -133,11 +144,69 @@ export class CommunicationHubComponent implements OnInit {
     return this.unreadCommunications.filter(c => c.communicationMode === mode).length;
   }
 
-  formatDate(date: Date): string {
+  formatDate(date: any): string {
+    if (!date) return 'Unknown';
+    
+    // Ensure we're working with a Date object
+    const dateObj = new Date(date);
     const now = new Date();
-    const diffInHours = (now.getTime() - new Date(date).getTime()) / (1000 * 60 * 60);
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
-    return new Date(date).toLocaleDateString();
+    
+    // Calculate difference in hours
+    const diffInMs = now.getTime() - dateObj.getTime();
+    const diffInHours = diffInMs / (1000 * 60 * 60);
+    
+    // If the difference is negative or very small, it's "Just now"
+    if (diffInHours < 0.02) return 'Just now'; // less than ~1 minute
+    
+    if (diffInHours < 1) {
+      const mins = Math.floor(diffInMs / (1000 * 60));
+      return `${mins}m ago`;
+    }
+    
+    if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`;
+    }
+    
+    return dateObj.toLocaleDateString();
+  }
+
+  openReplyDialog(comm: UnreadCommunicationDto): void {
+    // Construct a temporary party object for the dialog
+    const party: InvolvedPartyDto = {
+      partyId: comm.partyId,
+      firstName: comm.senderName?.split(' ')[0] || '',
+      lastName: comm.senderName?.split(' ').slice(1).join(' ') || '',
+      phone: comm.senderPhone,
+      email: comm.senderEmail,
+      involvedPartyType: 'Involved Party'
+    };
+    this.selectedParty = party;
+
+    // Close the preview modal so it doesn't sit on top of the reply dialog
+    this.showPreviewModal = false;
+
+    // Set inputs directly on the dialog to avoid Angular change detection timing issues
+    if (comm.communicationMode === 'Email') {
+      this.emailDialog.party = party;
+      this.emailDialog.claimId = comm.claimId;
+      this.emailDialog.show();
+    } else if (comm.communicationMode === 'SMS') {
+      this.smsDialog.party = party;
+      this.smsDialog.claimId = comm.claimId;
+      this.smsDialog.show();
+    } else if (comm.communicationMode === 'WhatsApp') {
+      this.whatsappDialog.party = party;
+      this.whatsappDialog.claimId = comm.claimId;
+      this.whatsappDialog.show();
+    }
+  }
+
+  onReplySent(): void {
+    if (this.selectedCommunication) {
+      this.communicationService.updateReadStatus(this.selectedCommunication.communicationId, true).subscribe(() => {
+        this.loadUnreadCommunications();
+        this.closePreviewModal();
+      });
+    }
   }
 }

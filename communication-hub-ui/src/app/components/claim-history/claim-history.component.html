@@ -1,0 +1,102 @@
+<div class="history-page-container" *ngIf="claim">
+  <!-- Header -->
+  <header class="hub-header">
+    <div class="flex items-center gap-4">
+      <button class="comm-icon-v2" (click)="goBack()">
+        <span class="icon">⬅️</span> Back to Dashboard
+      </button>
+      <div>
+        <div class="breadcrumb text-muted mb-1">{{ claim.claimNumber }} / Full History</div>
+        <h1>Communication Stream</h1>
+      </div>
+    </div>
+  </header>
+
+  <!-- Feed Area -->
+  <main class="feed-viewport p-6">
+    <div *ngIf="historyLoading" class="text-center p-20 bg-white card shadow-sm rounded-2xl">
+      <span class="e-icons e-spin e-loading" style="font-size: 40px; color: var(--primary-color);"></span>
+      <p class="mt-4 text-muted font-bold text-lg">Aggregating complete communication history...</p>
+    </div>
+
+    <div *ngIf="!historyLoading" class="history-container card p-0 shadow-xl rounded-2xl border-none">
+      <!-- Tabs -->
+      <div class="filter-tabs flex gap-4 p-5 bg-white border-b items-center justify-between">
+        <div class="flex gap-3">
+        <div class="pill-group">
+          <button *ngFor="let tab of tabs" 
+                  [class.active]="activeTab === tab"
+                  (click)="setActiveTab(tab)"
+                  class="pill-btn">
+            <span class="icon">{{ tab === 'All' ? '📂' : (tab === 'Email' ? '📧' : (tab === 'SMS' ? '💬' : '📱')) }}</span>
+            {{ tab }}
+          </button>
+        </div>
+        </div>
+        <div class="text-muted text-xs font-bold uppercase tracking-widest">
+          {{ filteredMessages.length }} Total Messages
+        </div>
+      </div>
+
+      <!-- Feed Grid -->
+      <div class="table-responsive">
+        <ejs-grid #grid [dataSource]="filteredMessages" [allowSorting]="true" [allowFiltering]="true" 
+                  [filterSettings]="{ type: 'Menu' }" width="100%" cssClass="hub-grid">
+          <e-columns>
+            <e-column field="timestamp" headerText="Date & Time" width="160">
+              <ng-template #template let-data>
+                <div class="font-bold text-gray-900">{{ data.timestamp | date:'MMM dd, yyyy' }}</div>
+                <div class="text-muted text-xs">{{ data.timestamp | date:'shortTime' }}</div>
+              </ng-template>
+            </e-column>
+            
+            <e-column field="partyName" headerText="Involved Party" width="180">
+              <ng-template #template let-data>
+                <div class="participant-info">
+                  <span class="p-name font-bold" [ngStyle]="{'color': data.direction === 'Incoming' ? 'var(--text-main)' : 'var(--primary-color)'}">
+                    {{ data.partyName || 'System' }}
+                  </span>
+                  <div class="direction-badge" [ngClass]="data.direction === 'Incoming' ? 'inbound' : 'outbound'">
+                    {{ data.direction }}
+                  </div>
+                </div>
+              </ng-template>
+            </e-column>
+            
+            <e-column field="mode" headerText="Type & Direction" width="140" textAlign="Center">
+              <ng-template #template let-data>
+                <div class="channel-indicator flex flex-column items-center">
+                  <div class="flex items-center gap-1">
+                    <span class="mode-emoji text-2xl">{{ data.mode === 'Email' ? '📧' : (data.mode === 'WhatsApp' ? '📱' : '💬') }}</span>
+                    <span class="direction-arrow" [ngStyle]="{'color': data.direction === 'Incoming' ? 'var(--success-color)' : 'var(--primary-color)'}">
+                      {{ data.direction === 'Incoming' ? '↓' : '↑' }}
+                    </span>
+                  </div>
+                  <span class="mode-name block text-[10px] font-black uppercase text-gray-400 mt-1">{{ data.mode }}</span>
+                </div>
+              </ng-template>
+            </e-column>
+            
+            <e-column field="notes" headerText="Note" width="200">
+              <ng-template #template let-data>
+                <div class="note-box p-1 bg-gray-50 rounded-lg text-xs text-gray-600 border border-dashed border-gray-200">
+                  <textarea rows="2" class="notes-input" style="width: 100%; border: none; background: transparent; font-size: inherit; resize: none;" 
+                            [(ngModel)]="data.notes" (blur)="updateMessageNotes(data)" placeholder="Note..."></textarea>
+                </div>
+              </ng-template>
+            </e-column>
+            
+            <e-column field="messageBody" headerText="Body" width="350">
+              <ng-template #template let-data>
+                <div class="message-bubble bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-sm line-height-relaxed mb-2">
+                  {{ data.messageBody }}
+                </div>
+                <app-attachment-viewer [attachments]="data.attachments" class="mt-2 block"></app-attachment-viewer>
+              </ng-template>
+            </e-column>
+          </e-columns>
+        </ejs-grid>
+      </div>
+    </div>
+  </main>
+</div>

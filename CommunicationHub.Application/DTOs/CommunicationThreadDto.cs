@@ -23,6 +23,7 @@ public class CommunicationMessageDto
     public string? Status { get; set; }
     public bool? IsRead { get; set; }
     public string? Notes { get; set; }
+    public string? PartyName { get; set; }
     public List<AttachmentDto>? Attachments { get; set; }
 }
 

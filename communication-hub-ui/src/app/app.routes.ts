@@ -27,6 +27,7 @@ export const routes: Routes = [
       { path: 'communications', loadComponent: () => import('./components/communication-hub/communication-hub.component').then(m => m.CommunicationHubComponent) },
       { path: 'claims/:id/details', loadComponent: () => import('./components/claim-details/claim-details.component').then(m => m.ClaimDetailsComponent) },
       { path: 'claims/:claimId/details/party/:partyId', loadComponent: () => import('./components/claim-details/claim-details.component').then(m => m.ClaimDetailsComponent) },
+      { path: 'claims/:id/history', loadComponent: () => import('./components/claim-history/claim-history.component').then(m => m.ClaimHistoryComponent) },
     ]
   },
 

@@ -1,16 +1,20 @@
 <div class="claim-hub-container" *ngIf="claim">
   <!-- Top Header -->
   <header class="hub-header">
-    <div class="flex items-center gap-4">
-      <button ejs-button [isPrimary]="false" cssClass="e-flat" (click)="viewMode === 'history' ? backToParties() : goBack()">
-        <span class="e-icons e-back-arrow"></span> {{ viewMode === 'history' ? 'Back to Parties' : 'Back to Dashboard' }}
-      </button>
-      <div>
-        <div class="breadcrumb text-muted mb-1" *ngIf="viewMode === 'history'">
-          {{ claim.claimNumber }} / {{ selectedParty?.fullName }}
+    <div class="flex items-center gap-4" style="justify-content: space-between; width: 100%;">
+      <div class="flex items-center gap-4">
+        <button ejs-button [isPrimary]="false" cssClass="e-flat" (click)="viewMode === 'history' ? backToParties() : goBack()">
+          <span class="e-icons e-back-arrow"></span> {{ viewMode === 'history' ? 'Back to Parties' : 'Back to Dashboard' }}
+        </button>
+        <div>
+          <div class="breadcrumb text-muted mb-1" *ngIf="viewMode === 'history'">
+            {{ claim.claimNumber }} / {{ selectedParty?.fullName }}
+          </div>
+          <h1>{{ viewMode === 'history' ? 'Communication History' : 'Involved Parties' }}</h1>
         </div>
-        <h1 *ngIf="viewMode === 'parties'">Involved Parties</h1>
-        <h1 *ngIf="viewMode === 'history'">Communication History</h1>
+      </div>
+      <div>
+        <!-- View Full History moved to Dashboard Grid -->
       </div>
     </div>
   </header>
@@ -31,110 +35,192 @@
     </div>
   </div>
 
-  <div class="hub-container p-6">
+  <div class="hub-container">
+    <!-- LEFT NAVIGATION: Handled by MainLayout Sidebar. This hub-container holds Main View + Right Sidebar -->
+    
     <!-- MAIN PANEL: PARTIES / HISTORY -->
     <main class="main-panel">
       <!-- LEVEL 1: INVOLVED PARTIES LIST -->
       <div *ngIf="viewMode === 'parties'" class="parties-view">
-        <div class="table-responsive card p-0 overflow-hidden shadow-sm">
-          <table class="hub-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Party Name</th>
-                <th>Type</th>
-                <th class="text-center">Quick Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let party of parties" (click)="showHistory(party)" class="clickable-row">
-                <td class="text-sm">{{ claim.claimFiledOn | date:'shortDate' }}</td>
-                <td>
-                  <div class="party-name">{{ party.fullName }}</div>
-                  <div class="party-contact text-muted text-xs">{{ party.phone || party.email }}</div>
-                </td>
-                <td><span class="type-pill">{{ party.involvedPartyType }}</span></td>
-                <td class="actions-col">
-                  <div class="flex justify-center gap-3">
-                    <button class="comm-icon-v2 sms" (click)="openSms(party, $event)" title="Send SMS">
-                      <span class="icon">💬</span> SMS
-                    </button>
-                    <button class="comm-icon-v2 email" (click)="openEmail(party, $event)" title="Send Email">
-                      <span class="icon">📧</span> Email
-                    </button>
-                    <button class="comm-icon-v2 whatsapp" (click)="openWhatsApp(party, $event)" title="Send WhatsApp">
-                      <span class="icon">📱</span> WhatsApp
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <ejs-grid [dataSource]="parties" [allowSorting]="true" [allowFiltering]="true" 
+                  [filterSettings]="filterSettings" [toolbar]="toolbarOptions" 
+                   width="100%" cssClass="hub-grid shadow-sm"
+                   (toolbarClick)="onToolbarClick($event)">
+          <e-columns>
+            <e-column headerText="Sr No" width="80" textAlign="Center">
+              <ng-template #template let-data>
+                {{ +data.index + 1 }}
+              </ng-template>
+            </e-column>
+            <e-column field="firstName" headerText="First Name" width="130"></e-column>
+            <e-column field="lastName" headerText="Last Name" width="130"></e-column>
+            <e-column field="involvedPartyType" headerText="Role" width="110">
+              <ng-template #template let-data>
+                <span class="type-pill badge badge-blue">{{ data.involvedPartyType }}</span>
+              </ng-template>
+            </e-column>
+            <e-column headerText="Injured" width="90" textAlign="Center">
+              <ng-template #template let-data>
+                <span class="badge" [ngClass]="{'badge-danger': data.isInjured === true, 'badge-green': data.isInjured !== true}">
+                  {{ data.isInjured ? 'Yes' : 'No' }}
+                </span>
+              </ng-template>
+            </e-column>
+            <e-column headerText="Options" width="180" textAlign="Center">
+              <ng-template #template let-data>
+                <div class="flex justify-center gap-2">
+                  <button class="comm-icon-v2" (click)="editParty(data, $event)" title="Edit">
+                    <span class="icon">✏️</span>
+                  </button>
+                  <button class="comm-icon-v2" (click)="showHistory(data, $event)" title="History">
+                    <span class="icon">👥</span>
+                  </button>
+                  <button class="comm-icon-v2 text-red-500" (click)="deleteParty(data, $event)" title="Delete">
+                    <span class="icon">🗑️</span>
+                  </button>
+                </div>
+              </ng-template>
+            </e-column>
+          </e-columns>
+        </ejs-grid>
       </div>
 
-      <!-- LEVEL 2: COMMUNICATION HISTORY FEED -->
+      <!-- UNIFIED HISTORY VIEW (Individual and Claim-wide) -->
       <div *ngIf="viewMode === 'history'" class="history-view">
-        <div *ngIf="historyLoading" class="text-center p-8 bg-white card shadow-sm">
-          <span class="e-icons e-spin e-loading" style="font-size: 32px"></span>
-          <p class="mt-2 text-muted">Loading history...</p>
+        <div *ngIf="historyLoading" class="text-center p-12 bg-white card shadow-sm">
+          <span class="e-icons e-spin e-loading" style="font-size: 32px; color: var(--primary-color);"></span>
+          <p class="mt-4 text-muted font-bold">Fetching history...</p>
         </div>
 
-        <div *ngIf="!historyLoading" class="history-container card p-0 overflow-hidden shadow-sm">
+        <div *ngIf="!historyLoading" class="history-container card p-0 shadow-sm">
           <!-- Filter Tabs -->
           <div class="filter-tabs flex gap-4 p-4 bg-gray-50 border-b">
-            <button *ngFor="let tab of tabs" 
-                    [class.active]="activeTab === tab"
-                    (click)="setActiveTab(tab)"
-                    class="tab-btn px-4 py-1 rounded-full text-xs font-bold transition-all"
-                    [ngClass]="activeTab === tab ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:border-blue-400'">
-              {{ tab }}
+            <div class="pill-group">
+              <button *ngFor="let tab of tabs" 
+                      [class.active]="activeTab === tab"
+                      (click)="setActiveTab(tab)"
+                      class="pill-btn">
+                <span class="icon">{{ tab === 'All' ? '📂' : (tab === 'Email' ? '📧' : (tab === 'SMS' ? '💬' : '📱')) }}</span>
+                {{ tab }}
+              </button>
+            </div>
+          </div>
+          <div class="p-4 bg-white flex justify-between items-center border-b">
+            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400 m-0">Involved Party communication</h4>
+            <button class="comm-icon-v2 flex items-center gap-2" style="background: var(--surface); padding: 8px 16px;" (click)="openChannelPicker()" title="New Communication">
+              <span class="icon">➕</span> New Message
             </button>
           </div>
-          <table class="hub-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Type</th>
-                <th>Direction</th>
-                <th>Message / History Context</th>
-                <th width="30%">Adjuster Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let msg of filteredMessages">
-                <td class="whitespace-nowrap text-sm">{{ msg.timestamp | date:'shortTime' }}<br><small class="text-muted">{{ msg.timestamp | date:'shortDate' }}</small></td>
-                <td>
-                  <div class="flex items-center gap-2">
-                    <span class="mode-icon">{{ msg.mode === 'Email' ? '📧' : (msg.mode === 'WhatsApp' ? '📱' : '💬') }}</span>
-                    <span>{{ msg.mode }}</span>
-                  </div>
-                </td>
-                <td>
-                  <span class="direction-badge" [ngClass]="msg.direction === 'Inbound' ? 'inbound' : 'outbound'">
-                    {{ msg.direction }}
-                  </span>
-                </td>
-                <td class="message-col">
-                  <div class="message-body text-sm">{{ msg.messageBody }}</div>
-                  <app-attachment-viewer [attachments]="msg.attachments"></app-attachment-viewer>
-                </td>
-                <td class="notes-col-edit">
-                  <textarea rows="2" class="notes-input" [(ngModel)]="msg.notes" 
-                            (blur)="updateMessageNotes(msg)" placeholder="Type private adjuster notes..."></textarea>
-                </td>
-              </tr>
-              <tr *ngIf="filteredMessages.length === 0">
-                <td colspan="5" class="text-center p-12 text-muted bg-gray-50">
-                  <div class="text-3xl mb-2">📭</div>
-                  <div>No {{ activeTab !== 'All' ? activeTab : '' }} communication history found for this party.</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          
+          <div class="table-responsive">
+            <ejs-grid #grid [dataSource]="filteredMessages" [allowSorting]="true" [allowFiltering]="true" 
+                      [filterSettings]="{ type: 'Menu' }" width="100%" cssClass="hub-grid">
+              <e-columns>
+                <e-column field="timestamp" headerText="Date & Time" width="160">
+                  <ng-template #template let-data>
+                    <div class="font-bold text-gray-900">{{ data.timestamp | date:'MMM dd, yyyy' }}</div>
+                    <div class="text-muted text-xs">{{ data.timestamp | date:'shortTime' }}</div>
+                  </ng-template>
+                </e-column>
+                
+                <e-column field="partyName" headerText="Involved Party" width="180">
+                  <ng-template #template let-data>
+                    <div class="party-name font-bold" [ngStyle]="{'color': data.direction === 'Incoming' ? 'var(--text-main)' : 'var(--primary-color)'}">
+                      {{ selectedParty?.fullName }}
+                    </div>
+                    <div class="direction-badge text-[10px] uppercase font-bold px-2 py-0.5 rounded mt-1 inline-block" 
+                         [ngClass]="data.direction === 'Incoming' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'">
+                      {{ data.direction }}
+                    </div>
+                  </ng-template>
+                </e-column>
+                
+                <e-column field="mode" headerText="Type & Direction" width="140" textAlign="Center">
+                  <ng-template #template let-data>
+                    <div class="channel-indicator flex flex-column items-center">
+                      <div class="flex items-center gap-1">
+                        <span class="mode-emoji text-2xl">{{ data.mode === 'Email' ? '📧' : (data.mode === 'WhatsApp' ? '📱' : '💬') }}</span>
+                        <span class="direction-arrow" [ngStyle]="{'color': data.direction === 'Incoming' ? 'var(--success-color)' : 'var(--primary-color)'}">
+                          {{ data.direction === 'Incoming' ? '↓' : '↑' }}
+                        </span>
+                      </div>
+                      <span class="mode-name block text-[10px] font-black uppercase text-gray-400 mt-1">{{ data.mode }}</span>
+                    </div>
+                  </ng-template>
+                </e-column>
+                
+                <e-column field="notes" headerText="Note" width="200">
+                  <ng-template #template let-data>
+                    <div class="note-box p-1 bg-gray-50 rounded-lg text-xs text-gray-600 border border-dashed border-gray-200">
+                      <textarea rows="2" class="notes-input" style="width: 100%; border: none; background: transparent; font-size: inherit; resize: none;" 
+                                [(ngModel)]="data.notes" (blur)="updateMessageNotes(data)" placeholder="Note..."></textarea>
+                    </div>
+                  </ng-template>
+                </e-column>
+                
+                <e-column field="messageBody" headerText="Body" width="350">
+                  <ng-template #template let-data>
+                    <div class="message-bubble bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-sm line-height-relaxed mb-2">
+                      {{ data.messageBody }}
+                    </div>
+                    <app-attachment-viewer [attachments]="data.attachments" class="mt-2 block"></app-attachment-viewer>
+                  </ng-template>
+                </e-column>
+              </e-columns>
+            </ejs-grid>
+          </div>
         </div>
       </div>
     </main>
+
+    <!-- RIGHT SIDEBAR: CLAIM DETAILS (Only shown in Parties view) -->
+    <aside class="right-sidebar" *ngIf="viewMode === 'parties'">
+      <div class="sidebar-section">
+        <span class="section-title">Claim Overview</span>
+        <div class="detail-row">
+          <span class="label">Claim #</span>
+          <span class="value">{{ claim.claimNumber }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Policy #</span>
+          <span class="value">{{ claim.policyNumber }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Status</span>
+          <span class="badge" [ngClass]="{
+            'badge-green': claim.status?.toLowerCase() === 'open',
+            'badge-warning': claim.status?.toLowerCase() === 'pending'
+          }">{{ claim.status }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Filed On</span>
+          <span class="value">{{ claim.claimFiledOn | date:'MMM dd, yyyy' }}</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="section-title">Assigned Adjuster</span>
+        <div class="adjuster-card shadow-sm">
+          <div class="initials-avatar">
+            {{ (claim.assignedAdjusterName || 'A')[0] }}
+          </div>
+          <div class="adj-info">
+            <span class="adj-name">{{ claim.assignedAdjusterName }}</span>
+            <span class="status-pill" [ngClass]="claim.isAdjusterActive ? 'active' : 'inactive'">
+              {{ claim.isAdjusterActive ? 'Active' : 'Out of Office' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <span class="section-title">Party Counts</span>
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+          <span class="text-sm font-bold">Total Involved</span>
+          <span class="badge badge-blue">{{ parties.length }}</span>
+        </div>
+      </div>
+    </aside>
   </div>
 </div>
 
@@ -146,3 +232,55 @@
 <app-sms-dialog #smsDialog [party]="selectedParty" [claimId]="claimId" (sent)="onCommSent()"></app-sms-dialog>
 <app-email-dialog #emailDialog [party]="selectedParty" [claimId]="claimId" (sent)="onCommSent()"></app-email-dialog>
 <app-whatsapp-dialog #whatsappDialog [party]="selectedParty" [claimId]="claimId" (sent)="onCommSent()"></app-whatsapp-dialog>
+<app-edit-party-dialog #editPartyDialog [claimId]="claimId" (updated)="loadClaim()"></app-edit-party-dialog>
+
+<!-- Better Channel Picker Dialog -->
+<div class="modal-overlay" *ngIf="showChannelPicker">
+  <div class="modal-content text-center p-8 shadow-2xl" 
+       style="width: 550px; background: var(--surface); border-radius: 24px; position: relative; border: 1px solid var(--border-color); overflow: hidden;">
+    
+    <button class="btn-close-v3" (click)="closeChannelPicker()">
+      <span class="e-icons e-close"></span>
+    </button>
+    
+    <div class="picker-header mb-8">
+      <div class="icon-pulse mb-4">
+        <span class="e-icons e-comment" style="font-size: 2rem; color: var(--primary-color);"></span>
+      </div>
+      <h2 style="font-size: 1.75rem; font-weight: 800; color: var(--text-main); margin: 0; letter-spacing: -0.02em;">Reach Out</h2>
+      <p class="text-muted mt-2">How would you like to contact <br><b>{{ selectedParty?.fullName }}</b>?</p>
+    </div>
+    
+    <div class="channel-options-grid">
+      <div class="channel-card" (click)="openSms(selectedParty!, $event); closeChannelPicker()">
+        <div class="channel-icon-bg bg-indigo-soft">
+          <span class="icon">💬</span>
+        </div>
+        <div class="channel-info">
+          <span class="channel-name">SMS Text</span>
+          <span class="channel-desc">Direct mobile messaging</span>
+        </div>
+      </div>
+      
+      <div class="channel-card" (click)="openEmail(selectedParty!, $event); closeChannelPicker()">
+        <div class="channel-icon-bg bg-blue-soft">
+          <span class="icon">📧</span>
+        </div>
+        <div class="channel-info">
+          <span class="channel-name">Email</span>
+          <span class="channel-desc">Professional correspondence</span>
+        </div>
+      </div>
+
+      <div class="channel-card" (click)="openWhatsApp(selectedParty!, $event); closeChannelPicker()">
+        <div class="channel-icon-bg bg-green-soft">
+          <span class="icon">📱</span>
+        </div>
+        <div class="channel-info">
+          <span class="channel-name">WhatsApp</span>
+          <span class="channel-desc">Instant secure chat</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

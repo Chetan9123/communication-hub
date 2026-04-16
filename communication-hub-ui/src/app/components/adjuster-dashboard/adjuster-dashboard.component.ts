@@ -73,12 +73,13 @@ export class AdjusterDashboardComponent implements OnInit {
     });
   }
 
-  onRowSelected(args: any) {
-    if (args.data) this.openClaim(args.data.claimId);
-  }
 
   openClaim(claimId: any) {
     this.router.navigate(['/claims', claimId, 'details']);
+  }
+
+  openHistory(claimId: any) {
+    this.router.navigate(['/claims', claimId, 'history']);
   }
 
   onToolbarClick(args: any) {

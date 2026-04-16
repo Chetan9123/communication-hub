@@ -85,6 +85,24 @@ public class CommunicationsController : ControllerBase
     }
 
     /// <summary>
+    /// GET /api/communications/claim/{claimId}/all
+    /// Fetches the chronological timeline for the entire claim across all parties
+    /// </summary>
+    [HttpGet("claim/{claimId}/all")]
+    public async Task<ActionResult<CommunicationThreadDto>> GetClaimCommunicationThread(int claimId)
+    {
+        try
+        {
+            var thread = await _communicationService.GetClaimCommunicationThreadAsync(claimId);
+            return Ok(thread);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// PUT /api/communications/{commId}/notes
     /// Updates the editable summary notes for a specific message
     /// </summary>

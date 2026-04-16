@@ -4,7 +4,7 @@
     <div class="sidebar-header">
       <div class="logo-area">
         <div class="logo-circle">CH</div>
-        <span class="logo-text" *ngIf="!isCollapsed">CommHub</span>
+        <span class="logo-text" *ngIf="!isCollapsed">CommunicationHUB</span>
       </div>
       <button class="collapse-toggle" (click)="toggleSidebar()">
         <i class="e-icons" [ngClass]="isCollapsed ? 'e-chevron-right' : 'e-chevron-left'"></i>
@@ -39,25 +39,8 @@
 
   <!-- Content Wrapper -->
   <div class="content-wrapper">
-    <header class="top-header">
-      <div class="header-left">
-        <div class="breadcrumb" *ngIf="!isCollapsed">
-          <span>Communication Hub</span>
-          <i class="e-icons e-chevron-right"></i>
-          <span class="active">Management</span>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="search-wrap">
-          <i class="e-icons e-search"></i>
-          <input type="text" placeholder="Search claims...">
-        </div>
-        <div class="header-actions">
-          <button class="action-btn"><i class="e-icons e-notification"></i></button>
-          <button class="action-btn"><i class="e-icons e-user"></i></button>
-        </div>
-      </div>
-    </header>
+    <!-- Header removed as per user request -->
+
 
     <main class="main-viewport">
       <router-outlet></router-outlet>

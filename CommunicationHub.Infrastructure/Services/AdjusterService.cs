@@ -44,7 +44,7 @@ public class AdjusterService : IAdjusterService
                 {
                     // Count unread communications for this claim
                     var unreadInClaim = await _context.Communications
-                        .CountAsync(c => c.ClaimId == claim.ClaimId && (c.ReadAt == null || c.ReadAt == false));
+                        .CountAsync(c => c.ClaimId == claim.ClaimId && c.Direction == "Inbound" && (c.ReadAt == null || c.ReadAt == false));
 
                     unreadCount += unreadInClaim;
 

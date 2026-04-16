@@ -10,6 +10,7 @@ export interface CommunicationMessageDto {
   messageBody?: (string | null);
   mode?: (string | null);
   notes?: (string | null);
+  partyName?: (string | null);
   status?: (string | null);
   timestamp?: (string | null);
 }

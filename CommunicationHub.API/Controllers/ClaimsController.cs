@@ -80,4 +80,64 @@ public class ClaimsController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// DELETE /api/claims/parties/{partyId}
+    /// Deletes an involved party
+    /// </summary>
+    [HttpDelete("parties/{partyId}")]
+    public async Task<ActionResult> DeleteParty(int partyId)
+    {
+        try
+        {
+            var success = await _claimService.DeleteInvolvedPartyAsync(partyId);
+            if (!success)
+                return NotFound(new { message = "Party not found" });
+
+            return Ok(new { message = "Party deleted successfully" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// PUT /api/claims/parties/{partyId}
+    /// Updates an involved party
+    /// </summary>
+    [HttpPut("parties/{partyId}")]
+    public async Task<ActionResult> UpdateParty(int partyId, [FromBody] InvolvedPartyDto dto)
+    {
+        try
+        {
+            var success = await _claimService.UpdateInvolvedPartyAsync(partyId, dto);
+            if (!success)
+                return NotFound(new { message = "Party not found" });
+
+            return Ok(new { message = "Party updated successfully" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/claims/{claimId}/parties
+    /// Adds a new involved party to a claim
+    /// </summary>
+    [HttpPost("{claimId}/parties")]
+    public async Task<ActionResult<int>> AddParty(int claimId, [FromBody] InvolvedPartyDto dto)
+    {
+        try
+        {
+            var partyId = await _claimService.AddInvolvedPartyAsync(claimId, dto);
+            return Ok(partyId);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

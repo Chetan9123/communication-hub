@@ -155,8 +155,15 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" (click)="closePreviewModal()">Close</button>
+      <button class="btn btn-outline" (click)="openReplyDialog(selectedCommunication)">
+        Reply via {{ selectedCommunication.communicationMode }}
+      </button>
       <button class="btn btn-primary" (click)="openClaimThread(selectedCommunication)">View Full Thread &rarr;</button>
+      <button class="btn btn-secondary" (click)="closePreviewModal()">Close</button>
     </div>
   </div>
 </div>
+
+<app-sms-dialog #smsDialog [party]="selectedParty" [claimId]="selectedCommunication?.claimId || 0" (sent)="onReplySent()"></app-sms-dialog>
+<app-email-dialog #emailDialog [party]="selectedParty" [claimId]="selectedCommunication?.claimId || 0" (sent)="onReplySent()"></app-email-dialog>
+<app-whatsapp-dialog #whatsappDialog [party]="selectedParty" [claimId]="selectedCommunication?.claimId || 0" (sent)="onReplySent()"></app-whatsapp-dialog>

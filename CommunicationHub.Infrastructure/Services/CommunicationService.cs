@@ -81,6 +81,8 @@ public class CommunicationService : ICommunicationService
             ReceivedAt = m.ReceivedAt,
             IsRead = m.ReadAt.HasValue && m.ReadAt.Value,
             Status = m.Status,
+            SenderPhone = m.Party?.Phone,
+            SenderEmail = m.Party?.Email,
             Attachments = m.MessageAttachments.Select(a => new AttachmentDto
             {
                 AttachmentId = a.AttachmentId,
@@ -151,6 +153,53 @@ public class CommunicationService : ICommunicationService
                 Status = m.Status,
                 IsRead = m.ReadAt.HasValue && m.ReadAt.Value,
                 Notes = m.Notes,
+                PartyName = $"{party.FirstName} {party.LastName}".Trim(),
+                Attachments = m.MessageAttachments.Select(a => new AttachmentDto
+                {
+                    AttachmentId = a.AttachmentId,
+                    FileUrl = a.FileUrl,
+                    MimeType = a.MimeType,
+                    FileSize = a.FileSize
+                }).ToList()
+            }).ToList()
+        };
+    }
+
+    public async Task<CommunicationThreadDto> GetClaimCommunicationThreadAsync(int claimId)
+    {
+        var claim = await _context.Claims
+            .Include(c => c.InvolvedParties)
+            .FirstOrDefaultAsync(c => c.ClaimId == claimId);
+
+        if (claim == null)
+            return new CommunicationThreadDto();
+
+        var messages = await _context.Communications
+            .Where(c => c.ClaimId == claimId && c.IsActive.HasValue && c.IsActive.Value)
+            .Include(c => c.Party)
+            .Include(c => c.MessageAttachments)
+            .Include(c => c.Channel)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+
+        return new CommunicationThreadDto
+        {
+            ClaimId = claim.ClaimId,
+            ClaimNumber = claim.ClaimNumber,
+            PolicyNumber = claim.PolicyNumber,
+            PartyId = 0, // Unused in this context
+            PartyName = "All Parties",
+            Messages = messages.Select(m => new CommunicationMessageDto
+            {
+                CommunicationId = m.CommunicationId,
+                Direction = m.Direction,
+                Timestamp = m.SentAt ?? m.ReceivedAt ?? m.CreatedAt,
+                Mode = m.Channel?.Name,
+                MessageBody = m.MessageBody,
+                Status = m.Status,
+                IsRead = m.ReadAt.HasValue && m.ReadAt.Value,
+                Notes = m.Notes,
+                PartyName = m.Party != null ? $"{m.Party.FirstName} {m.Party.LastName}".Trim() : "Unknown",
                 Attachments = m.MessageAttachments.Select(a => new AttachmentDto
                 {
                     AttachmentId = a.AttachmentId,
@@ -328,6 +377,9 @@ public class CommunicationService : ICommunicationService
                 PartyId = request.PartyId,
                 ChannelId = channel.ChannelId,
                 AdjusterId = adjusterId,
+                Direction = "Outgoing",
+                MessageType = request.Mode,
+                MessageBody = body,
                 Status = isSent ? "Sent" : (isChannelEnabled ? "Failed" : "Disabled"),
                 SentAt = isSent ? DateTime.UtcNow : DateTime.UtcNow,
                 ReceivedAt = DateTime.UtcNow,
@@ -774,10 +826,18 @@ public class CommunicationService : ICommunicationService
 
     public async Task<bool> ValidateAdjusterAccessAsync(int adjusterId, int claimId)
     {
-        var assignment = await _context.ClaimAdjusters
-            .FirstOrDefaultAsync(ca => ca.AdjusterId == adjusterId && ca.ClaimId == claimId);
+        // Primary check: is the adjuster directly assigned via ClaimAdjusters?
+        var directAssignment = await _context.ClaimAdjusters
+            .AnyAsync(ca => ca.AdjusterId == adjusterId && ca.ClaimId == claimId);
 
-        return assignment != null;
+        if (directAssignment) return true;
+
+        // Fallback: has this adjuster already processed communications for this claim?
+        // (e.g. they received the unread message that they are now trying to reply to)
+        var hasComms = await _context.Communications
+            .AnyAsync(c => c.AdjusterId == adjusterId && c.ClaimId == claimId);
+
+        return hasComms;
     }
 
     public async Task<Dictionary<string, bool>> GetEnabledChannelsAsync()
