@@ -111,5 +111,10 @@ build_output.txt
 build_errors.txt
 backendF.drawio.png
 addColumn.txt
+GetRegion.cstest.jpeg
+log.txt
+build_output.txt
+build_errors.txt
+backendF.drawio.png
+addColumn.txt
 GetRegion.cs
-.gitignore
