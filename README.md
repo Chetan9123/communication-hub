@@ -358,16 +358,6 @@ Browser                          API
 
 ---
 
-## 📄 Additional Documentation
-
-| File | Contents |
-|------|----------|
-| [`QUICKSTART.md`](./QUICKSTART.md) | 5-minute setup walkthrough |
-| [`AUTHENTICATION_SETUP.md`](./AUTHENTICATION_SETUP.md) | Auth flow deep-dive |
-| [`COMMUNICATION_HUB_SETUP_GUIDE.md`](./COMMUNICATION_HUB_SETUP_GUIDE.md) | Full deployment guide |
-| [`IMPLEMENTATION_CHECKLIST.md`](./IMPLEMENTATION_CHECKLIST.md) | Implementation progress tracker |
-
----
 
 ## 📜 License
 
