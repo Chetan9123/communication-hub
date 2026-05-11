@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="communication-hub-ui/communication-hub-ui.csproj" />
+  <Project Path="CommunicationHub.API/CommunicationHub.API.csproj" />
+  <Project Path="CommunicationHub.Application/CommunicationHub.Application.csproj" />
+  <Project Path="CommunicationHub.Domain/CommunicationHub.Domain.csproj" />
+  <Project Path="CommunicationHub.Infrastructure/CommunicationHub.Infrastructure.csproj" />
+</Solution>

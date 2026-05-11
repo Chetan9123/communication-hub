@@ -1,0 +1,65 @@
+<div class="dashboard-container">
+  <div class="header-section">
+    <div class="title-area">
+      <h1>Claims Dashboard</h1>
+      <p class="text-muted">Manage your assigned insurance claims and communications.</p>
+    </div>
+    <div class="action-area">
+      <button ejs-button [isPrimary]="false" (click)="toggleStatus()" 
+        [ngClass]="isActive ? 'status-active' : 'status-ooo'"
+        class="e-control e-btn e-lib e-btn-icon-left">
+        <span class="e-btn-icon e-icons" [ngClass]="isActive ? 'e-circle-check' : 'e-circle-remove'"></span>
+        {{ isActive ? 'Active' : 'Out of Office' }}
+      </button>
+      <button ejs-button [isPrimary]="false" (click)="loadAll()" class="e-control e-btn e-lib e-btn-icon-left">
+        <span class="e-btn-icon e-icons e-refresh"></span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats row removed as per user request -->
+
+
+  <div class="grid-section">
+    <ejs-grid #grid [dataSource]="claims" [allowPaging]="true" [pageSettings]="pageSettings"
+      [allowSorting]="true" [allowFiltering]="true" [filterSettings]="filterSettings"
+      [allowExcelExport]="true" [allowPdfExport]="true" [toolbar]="toolbarOptions"
+      (toolbarClick)="onToolbarClick($event)">
+      <e-columns>
+        <e-column field="claimNumber" headerText="Claim #" width="150" isPrimaryKey="true">
+          <ng-template #template let-data>
+            <span class="claim-link" (click)="openClaim(data.claimId)">{{ data.claimNumber }}</span>
+          </ng-template>
+        </e-column>
+        <e-column field="policyNumber" headerText="Policy #" width="150"></e-column>
+        <e-column field="status" headerText="Status" width="120">
+          <ng-template #template let-data>
+            <span class="badge" [ngClass]="{
+              'badge-green': data.status?.toLowerCase() === 'open',
+              'badge-warning': data.status?.toLowerCase() === 'pending',
+              'badge-blue': data.status?.toLowerCase() === 'closed'
+            }">{{ data.status }}</span>
+          </ng-template>
+        </e-column>
+        <e-column field="unreadCommunicationCount" headerText="Unread" width="100" textAlign="Center">
+          <ng-template #template let-data>
+            <span *ngIf="+data.unreadCommunicationCount > 0" class="badge badge-danger">{{ data.unreadCommunicationCount }}</span>
+            <span *ngIf="!data.unreadCommunicationCount || +data.unreadCommunicationCount === 0" class="text-muted">—</span>
+          </ng-template>
+        </e-column>
+        <e-column field="claimFiledOn" headerText="Filed On" width="150" type="date" format="MMM dd, yyyy"></e-column>
+        <e-column headerText="Actions" width="220" textAlign="Center">
+          <ng-template #template let-data>
+            <div class="flex gap-2 justify-center">
+              <button ejs-button [isPrimary]="true" (click)="openClaim(data.claimId)">Details</button>
+              <button ejs-button [isPrimary]="false" cssClass="e-outline e-info" 
+                      (click)="openHistory(data.claimId)" title="Full History">
+                <span class="e-btn-icon e-icons e-comment-show"></span>
+              </button>
+            </div>
+          </ng-template>
+        </e-column>
+      </e-columns>
+    </ejs-grid>
+  </div>
+</div>

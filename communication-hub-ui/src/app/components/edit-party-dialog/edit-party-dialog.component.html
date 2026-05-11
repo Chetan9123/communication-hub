@@ -1,0 +1,65 @@
+<ejs-dialog #editDialog 
+            [header]="isAddMode ? 'Add Involved Party' : 'Edit Involved Party'" 
+            [visible]="false" 
+            [showCloseIcon]="true" 
+            [isModal]="true"
+            width="500px" 
+            cssClass="premium-dialog">
+  
+  <ng-template #content>
+    <div class="edit-party-form p-6">
+      <div class="party-summary mb-6 flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+        <div class="avatar-circle">
+          {{ (editModel.firstName || 'P')[0] }}
+        </div>
+        <div>
+          <h3 class="m-0 font-bold text-lg" *ngIf="!isAddMode">{{ editModel.fullName }}</h3>
+          <h3 class="m-0 font-bold text-lg" *ngIf="isAddMode">Add Initial Details</h3>
+          <span class="text-muted text-sm">{{ editModel.involvedPartyType }}</span>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-row grid grid-cols-2 gap-4 mb-4">
+          <div class="form-group">
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">First Name</label>
+            <ejs-textbox [(value)]="editModel.firstName" placeholder="First Name" floatLabelType="Never" cssClass="e-outline"></ejs-textbox>
+          </div>
+          <div class="form-group">
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Last Name</label>
+            <ejs-textbox [(value)]="editModel.lastName" placeholder="Last Name" floatLabelType="Never" cssClass="e-outline"></ejs-textbox>
+          </div>
+        </div>
+        <div class="form-group mb-4">
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Involved Role</label>
+          <ejs-dropdownlist [dataSource]="roles" [(value)]="editModel.involvedPartyType" 
+                            placeholder="Select Role" cssClass="e-outline"></ejs-dropdownlist>
+        </div>
+
+        <div class="form-group mb-4">
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Email Address</label>
+          <ejs-textbox [(value)]="editModel.email" placeholder="Email" floatLabelType="Never" cssClass="e-outline"></ejs-textbox>
+        </div>
+
+        <div class="form-group mb-4">
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Phone / WhatsApp</label>
+          <ejs-textbox [(value)]="editModel.phone" placeholder="Phone Number" floatLabelType="Never" cssClass="e-outline"></ejs-textbox>
+        </div>
+
+        <div class="form-group mt-2">
+          <ejs-checkbox label="Mark as Injured" [checked]="!!editModel.isInjured" 
+                       (change)="editModel.isInjured = $event.checked ?? false"></ejs-checkbox>
+        </div>
+      </div>
+    </div>
+  </ng-template>
+
+  <ng-template #footerTemplate>
+    <div class="p-4 bg-gray-50 flex justify-end gap-3">
+      <button ejs-button cssClass="e-flat" (click)="hide()">Cancel</button>
+      <button ejs-button [isPrimary]="true" (click)="save()" [disabled]="isSaving">
+        {{ isSaving ? 'Saving...' : 'Save Changes' }}
+      </button>
+    </div>
+  </ng-template>
+</ejs-dialog>

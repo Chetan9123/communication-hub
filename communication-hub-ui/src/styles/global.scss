@@ -1,0 +1,257 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ==========================================
+   SYNCFUSION MATERIAL THEME IMPORTS
+   ========================================== */
+@import "../../node_modules/@syncfusion/ej2-base/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-buttons/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-calendars/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-dropdowns/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-inputs/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-navigations/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-popups/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-splitbuttons/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-angular-grids/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-angular-richtexteditor/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-angular-notifications/styles/material.css";
+@import "../../node_modules/@syncfusion/ej2-angular-lists/styles/material.css";
+
+/* ==========================================
+   GLOBAL DESIGN SYSTEM
+   ========================================== */
+
+:root {
+  --primary-color: #1e40af;
+  --primary-hover: #1d4ed8;
+  --secondary-color: #64748b;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --background-alt: #f1f5f9;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --surface: #ffffff;
+  --border-color: #e2e8f0;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--background-alt);
+  color: var(--text-main);
+  overflow: hidden; /* Main layout uses flex/scroll */
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-main);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ==========================================
+   SYNCFUSION OVERRIDES & POLISH
+   ========================================== */
+
+.e-grid {
+  border: none !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background: var(--surface);
+  font-family: inherit !important;
+}
+
+.e-grid .e-headercell {
+  background-color: #f8fafc !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  font-size: 11px !important;
+  color: #475569 !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.e-grid .e-rowcell {
+  font-size: 14px !important;
+  padding: 12px 16px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.e-grid .e-row:hover .e-rowcell {
+  background-color: #f8fafc !important;
+  cursor: pointer;
+}
+
+.e-btn {
+  font-family: inherit !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius-sm) !important;
+}
+
+.e-btn.e-primary {
+  background-color: var(--primary-color) !important;
+}
+
+.e-btn.e-primary:hover {
+  background-color: var(--primary-hover) !important;
+}
+
+.e-dialog {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border: none !important;
+}
+
+.e-dlg-header {
+  font-weight: 700 !important;
+  font-size: 18px !important;
+}
+
+.e-footer-content {
+  padding: 16px 24px !important;
+  background-color: #f8fafc !important;
+  border-top: 1px solid var(--border-color) !important;
+}
+
+.e-tab .e-tab-header {
+  background-color: var(--surface) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.e-tab .e-tab-header .e-toolbar-item .e-tab-text {
+  font-weight: 600 !important;
+}
+
+/* ==========================================
+   LAYOUT UTILITIES
+   ========================================== */
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.flex { display: flex; }
+.flex-1 { flex: 1; }
+.flex-column { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-4 { gap: 16px; }
+
+.text-muted { color: var(--text-muted); font-size: 0.875rem; }
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.badge-blue { background: #e0f2fe; color: #0369a1; }
+.badge-green { background: #dcfce7; color: #15803d; }
+.badge-warning { background: #fef3c7; color: #b45309; }
+.badge-danger { background: #fee2e2; color: #b91c1c; }
+
+/* ==========================================
+   COMMUNICATION HUB COMPONENTS
+   ========================================== */
+
+.direction-arrow {
+  font-weight: 900 !important;
+  font-size: 1.4rem;
+  line-height: 1;
+  display: inline-block;
+  vertical-align: middle;
+  text-shadow: 0 0 1px currentColor;
+  transform: translateY(1px);
+}
+
+/* ==========================================
+   PREMIUM UI UTILITIES
+   ========================================== */
+
+/* Host stretch to prevent "squeezy" layouts */
+app-adjuster-dashboard, 
+app-communication-hub, 
+app-claim-details,
+app-claim-history {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+}
+
+.pill-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--background-alt);
+  padding: 6px;
+  border-radius: 14px;
+  width: fit-content;
+  border: 1px solid var(--border-color);
+}
+
+.pill-btn {
+  border: none;
+  background: transparent;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .icon { font-size: 1.1rem; filter: grayscale(1); opacity: 0.7; transition: all 0.2s; }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.5);
+    color: var(--text-main);
+  }
+
+  &.active {
+    background: var(--surface);
+    color: var(--primary-color);
+    box-shadow: var(--shadow-md);
+    
+    .icon { filter: none; opacity: 1; }
+  }
+}

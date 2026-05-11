@@ -1,0 +1,78 @@
+<div class="attachments-container mt-2" *ngIf="attachments && attachments.length > 0">
+  <div class="attachment-cards">
+    <div *ngFor="let att of attachments" class="attachment-card" (click)="openPreview(att, $event)" title="{{ getFallbackName(att) }}">
+      <div class="attachment-icon" *ngIf="!att.attachmentId || !attachmentUrls[att.attachmentId]">
+        <i class="fa fa-fw" [ngClass]="getFileIcon(att.mimeType)"></i>
+      </div>
+      <div class="attachment-icon inline-preview" *ngIf="att.attachmentId && attachmentUrls[att.attachmentId]" style="background: transparent; overflow: hidden; padding: 0;">
+        <img [src]="attachmentUrls[att.attachmentId]" style="width: 100%; height: 100%; object-fit: cover; border-radius: 6px;">
+      </div>
+      <div class="attachment-details">
+        <div class="attachment-name">{{ getFallbackName(att) }}</div>
+        <div class="attachment-size">{{ formatFileSize(att.fileSize) }}</div>
+      </div>
+      <div class="attachment-actions">
+        <button class="dl-btn" (click)="downloadFile(att, $event)" title="Download">
+          <i class="fa fa-download"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ejs-dialog #previewDialog [isModal]="true" [width]="'800px'" [visible]="false" 
+            [showCloseIcon]="true" [allowDragging]="true" [header]="previewModel.attachment ? getFallbackName(previewModel.attachment) : 'Preview'"
+            (close)="closePreview()" cssClass="attachment-preview-modal custom-dialog-overlay">
+  <ng-template #content>
+    
+    <!-- Loader -->
+    <div class="preview-loader flex flex-col items-center justify-center p-8" *ngIf="isLoadingUrl">
+      <span class="e-icons e-spin e-loading" style="font-size: 32px"></span>
+      <p class="mt-4 text-gray-500">Retrieving secure file link...</p>
+    </div>
+
+    <!-- Error state -->
+    <div class="preview-error flex flex-col items-center justify-center p-8 text-center" *ngIf="!isLoadingUrl && previewModel.error">
+      <i class="fa fa-exclamation-triangle text-4xl text-red-400 mb-3 block"></i>
+      <p class="text-gray-700">{{ previewModel.error }}</p>
+      <button class="mt-4 e-btn e-outline e-primary" (click)="downloadFile(previewModel.attachment!)">
+        Try Downloading Directly
+      </button>
+    </div>
+
+    <!-- Ready State (URL exists) -->
+    <div class="preview-content-wrapper flex justify-center items-center h-full w-full" *ngIf="!isLoadingUrl && previewModel.url">
+      
+      <!-- Image Preview -->
+      <div class="preview-image-container w-full h-full flex justify-center" *ngIf="previewModel.type === 'image'">
+        <img [src]="previewModel.url" alt="Preview" class="preview-media image-preview max-w-full max-h-[600px] object-contain" />
+      </div>
+
+      <!-- Video Preview -->
+      <div class="preview-video-container w-full flex justify-center" *ngIf="previewModel.type === 'video'">
+        <video controls [src]="previewModel.url" class="preview-media video-preview max-w-full max-h-[600px] outline-none"></video>
+      </div>
+
+      <!-- Audio Preview -->
+      <div class="preview-audio-container w-full flex flex-col items-center justify-center py-10" *ngIf="previewModel.type === 'audio'">
+        <i class="fa fa-music text-6xl text-gray-300 mb-6 block"></i>
+        <audio controls [src]="previewModel.url" class="preview-media audio-preview w-full max-w-md outline-none"></audio>
+      </div>
+
+      <!-- PDF Preview -->
+      <div class="preview-pdf-container w-full h-[600px]" *ngIf="previewModel.type === 'pdf'">
+        <iframe [src]="previewModel.url" class="preview-media pdf-preview w-full h-full rounded border border-gray-200" frameborder="0"></iframe>
+      </div>
+      
+    </div>
+  </ng-template>
+
+  <ng-template #footerTemplate>
+    <div class="flex justify-end gap-2 w-full">
+      <button class="e-btn" (click)="closePreview()">Close</button>
+      <button class="e-btn e-primary" *ngIf="previewModel.attachment" (click)="downloadFile(previewModel.attachment)">
+        <i class="fa fa-download mr-1"></i> Download Instead
+      </button>
+    </div>
+  </ng-template>
+</ejs-dialog>

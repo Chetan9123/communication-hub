@@ -1,0 +1,169 @@
+<div class="communication-hub p-8">
+
+  <div class="hub-header">
+    <div>
+      <h1>Unread Communications</h1>
+      <p class="subtitle">Manage and respond to incoming messages</p>
+    </div>
+    <button class="btn-refresh" (click)="loadUnreadCommunications()" [disabled]="isLoading">Refresh</button>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Unread</div>
+      <div class="stat-value stat-red">{{ unreadCommunications.length }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Emails</div>
+      <div class="stat-value">{{ getCountByMode('Email') }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">SMS</div>
+      <div class="stat-value">{{ getCountByMode('SMS') }}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">WhatsApp</div>
+      <div class="stat-value">{{ getCountByMode('WhatsApp') }}</div>
+    </div>
+  </div>
+
+  <div class="filter-card">
+    <div class="filter-row">
+      <div class="search-group">
+        <label class="filter-label">Search</label>
+        <div class="search-box">
+          <span class="search-icon">&#128269;</span>
+          <input
+            type="text"
+            placeholder="Search by claim number, party name, or message..."
+            [value]="searchTerm"
+            (input)="onSearchChange($any($event.target).value)"
+            class="search-input"
+          />
+        </div>
+      </div>
+      <div class="date-group">
+        <label class="filter-label">Date Range</label>
+        <button class="btn-date-range">Last 30 Days</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="result-count">
+    Showing {{ filteredCommunications.length }} unread message{{ filteredCommunications.length !== 1 ? 's' : '' }}
+  </p>
+
+  <div *ngIf="isLoading" class="empty-state">Loading communications...</div>
+
+  <div *ngIf="!isLoading && filteredCommunications.length === 0" class="empty-state">
+    <span *ngIf="!searchTerm && !modeFilter">🎉 All caught up! No unread messages.</span>
+    <span *ngIf="searchTerm || modeFilter">No communications match your search.</span>
+  </div>
+
+  <div *ngIf="!isLoading && filteredCommunications.length > 0" class="table-card">
+    <table class="comm-table">
+      <thead>
+        <tr>
+          <th>Claim Number</th>
+          <th>Policy Number</th>
+          <th>Communication Mode</th>
+          <th>Message Preview</th>
+          <th>Sender Name</th>
+          <th>Date</th>
+          <th class="col-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          *ngFor="let comm of filteredCommunications"
+          class="comm-row"
+          [class.is-read]="comm.isRead"
+          (click)="previewCommunication(comm, $event)"
+        >
+          <td>
+            <a class="link-blue" (click)="openClaimThread(comm); $event.stopPropagation()">{{ comm.claimNumber }}</a>
+          </td>
+          <td>{{ comm.policyNumber }}</td>
+          <td>
+            <span class="mode-cell">{{ getModeIcon(comm.communicationMode) }} {{ comm.communicationMode }}</span>
+          </td>
+          <td class="col-message">
+            <span class="message-truncate">{{ comm.messagePreview }}</span>
+          </td>
+          <td>
+            <a class="link-blue" (click)="$event.stopPropagation()">{{ comm.senderName }}</a>
+          </td>
+          <td class="col-date">{{ formatDate(comm.receivedAt) }}</td>
+          <td class="col-actions">
+            <div class="action-buttons">
+              <button class="btn-icon" title="Preview" (click)="previewCommunication(comm, $event)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+              <button class="btn-icon" title="Open Claim" (click)="openClaimThread(comm); $event.stopPropagation()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              </button>
+              <button class="btn-icon btn-reply" title="Reply" (click)="toggleReadStatus(comm, $event)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div *ngIf="filteredCommunications.length > 0" class="pagination">
+    <button class="page-btn">&#8249; Previous</button>
+    <button class="page-btn page-active">1</button>
+    <button class="page-btn">2</button>
+    <button class="page-btn">3</button>
+    <button class="page-btn">Next &#8250;</button>
+  </div>
+</div>
+
+<!-- Preview Modal -->
+<div *ngIf="showPreviewModal" class="modal-overlay" (click)="closePreviewModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()" *ngIf="selectedCommunication">
+    <button class="btn-close" (click)="closePreviewModal()">&#x2715;</button>
+    <div class="modal-header">
+      <h2>{{ getModeIcon(selectedCommunication.communicationMode) }} Message Preview</h2>
+    </div>
+    <div class="modal-body">
+      <div class="preview-section">
+        <div class="section-label">From</div>
+        <div class="section-value">{{ selectedCommunication.senderName }}</div>
+      </div>
+      <div class="preview-section">
+        <div class="section-label">Claim &amp; Policy</div>
+        <div class="section-value">{{ selectedCommunication.claimNumber }} | {{ selectedCommunication.policyNumber }}</div>
+      </div>
+      <div class="preview-section">
+        <div class="section-label">Mode</div>
+        <div class="section-value">{{ selectedCommunication.communicationMode }}</div>
+      </div>
+      <div class="preview-section">
+        <div class="section-label">Received</div>
+        <div class="section-value">{{ selectedCommunication.receivedAt | date: 'medium' }}</div>
+      </div>
+      <div class="preview-section">
+        <div class="section-label">Message</div>
+        <div class="section-value message-body">{{ selectedCommunication.messagePreview }}</div>
+      </div>
+      <div class="preview-section" *ngIf="selectedCommunication.attachments && selectedCommunication.attachments.length > 0">
+        <div class="section-label">Attachments</div>
+        <app-attachment-viewer [attachments]="selectedCommunication.attachments"></app-attachment-viewer>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" (click)="openReplyDialog(selectedCommunication)">
+        Reply via {{ selectedCommunication.communicationMode }}
+      </button>
+      <button class="btn btn-primary" (click)="openClaimThread(selectedCommunication)">View Full Thread &rarr;</button>
+      <button class="btn btn-secondary" (click)="closePreviewModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<app-sms-dialog #smsDialog [party]="selectedParty" [claimId]="selectedCommunication?.claimId || 0" (sent)="onReplySent()"></app-sms-dialog>
+<app-email-dialog #emailDialog [party]="selectedParty" [claimId]="selectedCommunication?.claimId || 0" (sent)="onReplySent()"></app-email-dialog>
+<app-whatsapp-dialog #whatsappDialog [party]="selectedParty" [claimId]="selectedCommunication?.claimId || 0" (sent)="onReplySent()"></app-whatsapp-dialog>

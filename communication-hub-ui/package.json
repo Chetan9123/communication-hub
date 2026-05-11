@@ -1,0 +1,51 @@
+{
+  "name": "communication-hub-ui",
+  "version": "1.0.0",
+  "description": "Communication Hub UI - Angular frontend for managing claims and communications",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "lint": "ng lint"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/animations": "^18.0.0",
+    "@angular/common": "^18.0.0",
+    "@angular/compiler": "^18.0.0",
+    "@angular/core": "^18.0.0",
+    "@angular/forms": "^18.0.0",
+    "@angular/platform-browser": "^18.0.0",
+    "@angular/platform-browser-dynamic": "^18.0.0",
+    "@angular/router": "^18.0.0",
+    "@syncfusion/ej2-angular-buttons": "^33.1.44",
+    "@syncfusion/ej2-angular-dropdowns": "^33.1.47",
+    "@syncfusion/ej2-angular-grids": "^33.1.47",
+    "@syncfusion/ej2-angular-navigations": "^33.1.47",
+    "@syncfusion/ej2-angular-notifications": "^33.1.44",
+    "@syncfusion/ej2-angular-popups": "^33.1.44",
+    "@syncfusion/ej2-angular-richtexteditor": "^33.1.48",
+    "rxjs": "^7.8.0",
+    "tslib": "^2.4.0",
+    "zone.js": "^0.14.0"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "^18.0.0",
+    "@angular/cli": "^18.0.0",
+    "@angular/compiler-cli": "^18.0.0",
+    "@syncfusion/ej2-angular-inputs": "^33.1.47",
+    "@syncfusion/ej2-angular-lists": "^33.1.47",
+    "@types/jasmine": "^5.1.0",
+    "eslint": "^10.2.1",
+    "jasmine-core": "^5.0.0",
+    "karma": "^6.4.0",
+    "karma-chrome-launcher": "^3.2.0",
+    "karma-coverage": "^2.2.0",
+    "karma-jasmine": "^5.1.0",
+    "karma-jasmine-html-reporter": "^2.1.0",
+    "ng-openapi-gen": "^1.0.5",
+    "typescript": "^5.2.0"
+  }
+}

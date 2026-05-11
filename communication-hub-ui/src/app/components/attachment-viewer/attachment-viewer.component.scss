@@ -1,0 +1,107 @@
+.attachments-container {
+  width: 100%;
+}
+
+.attachment-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attachment-card {
+  display: flex;
+  align-items: center;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 160px;
+  max-width: 260px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+
+  &:hover {
+    background-color: var(--surface);
+    border-color: var(--border-color);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+
+    .attachment-actions {
+      opacity: 1;
+    }
+  }
+
+  .attachment-icon {
+    font-size: 24px;
+    margin-right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+  }
+
+  .attachment-details {
+    flex: 1;
+    min-width: 0;
+    margin-right: 20px; /* space for download button */
+    
+    .attachment-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+
+    .attachment-size {
+      font-size: 0.70rem;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+  }
+
+  .attachment-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: 1; /* Made always visible per user request */
+    transition: opacity 0.2s ease;
+
+    .dl-btn {
+      background: #e2e8f0;
+      border: none;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.1s ease;
+      color: #475569;
+
+      &:hover {
+        background: #cbd5e1;
+        color: #0f172a;
+      }
+      
+      i {
+        font-size: 13px;
+      }
+    }
+  }
+}
+
+// Modal adjustments
+::ng-deep .attachment-preview-modal {
+  /* Hide pure white backdrop in the content area for better media presentation */
+  .e-dlg-content {
+    background: #f8fafc;
+  }
+}
