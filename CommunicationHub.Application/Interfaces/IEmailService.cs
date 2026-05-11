@@ -29,5 +29,6 @@ public interface IEmailService
         string subject,
         string text,
         string? html,
+        IEnumerable<(string FileName, Stream Data, string ContentType)>? attachments = null,
         CancellationToken cancellationToken = default);
 }

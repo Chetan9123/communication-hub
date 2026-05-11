@@ -79,29 +79,26 @@
   }
 }
 
-.hub-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+.hub-grid {
+  flex: 1;
+  width: 100% !important;
 
-  th {
-    padding: 1.25rem 1.5rem;
-    background: #f8fafc;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.7rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    letter-spacing: 0.05em;
-  }
-
-  td {
-    padding: 1.5rem;
-    vertical-align: top;
-    border-bottom: 1px solid #f1f5f9;
-  }
-
-  tbody tr:last-child td {
-    border-bottom: none;
+  ::ng-deep {
+    .e-rowcell {
+      padding: 1rem !important;
+      white-space: normal !important;
+    }
+    .e-gridcontent .e-content {
+      overflow-y: auto !important;
+    }
   }
 }
+
+.message-bubble {
+  max-width: 100%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+

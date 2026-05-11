@@ -71,11 +71,14 @@ public class EmailController : ControllerBase
     {
         _logger.LogInformation("Inbound email webhook received. Subject: {Subject}", subject);
 
+        var attachments = Request.Form.Files.Select(f => (f.FileName, f.OpenReadStream(), f.ContentType));
+
         var success = await _emailService.ProcessInboundEmailAsync(
             from    ?? string.Empty,
             subject ?? string.Empty,
             text    ?? string.Empty,
             html,
+            attachments,
             HttpContext.RequestAborted);
 
         if (success)

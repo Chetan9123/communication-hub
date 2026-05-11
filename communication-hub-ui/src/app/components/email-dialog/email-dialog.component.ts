@@ -7,8 +7,7 @@ import { RichTextEditorModule, ToolbarService, LinkService, ImageService, HtmlEd
 import { UploaderModule, SelectedEventArgs } from '@syncfusion/ej2-angular-inputs';
 import { InvolvedPartyDto } from '../../api/models';
 import { Api } from '../../api/api';
-import { apiAttachmentsUploadPost$Json } from '../../api/fn/attachments/api-attachments-upload-post-json';
-import { apiCommunicationsSendPost } from '../../api/fn/communications/api-communications-send-post';
+import { apiAttachmentsUploadPost$Json, apiCommunicationsSendPost } from '../../api/functions';
 import { ToastService } from '../../services/toast.service';
 
 @Component({
@@ -19,62 +18,148 @@ import { ToastService } from '../../services/toast.service';
   template: `
     <ejs-dialog #emailDialog [header]="'Compose Email'" [visible]="false"
                 [showCloseIcon]="true" [target]="'body'"
-                [width]="'750px'" [isModal]="true" [animationSettings]="{ effect: 'Zoom' }">
+                [width]="'780px'" [isModal]="true" [animationSettings]="{ effect: 'Zoom' }"
+                cssClass="comm-dialog email-theme">
       <ng-template #content>
-        <div class="email-form p-4">
-          <div class="regarding-banner mb-4">
-            <span class="lbl">Regarding:</span> 
-            <span class="val">Claim #{{ claimId }}</span>
+        <div class="comm-form-container p-6">
+          <div class="context-card email-card mb-6">
+            <div class="card-section border-r border-indigo-100/50">
+              <div class="label">Regarding</div>
+              <div class="value font-black text-indigo-900">Claim #{{ claimId }}</div>
+              <div class="subtitle">Property Claim</div>
+            </div>
+            <div class="card-section">
+              <div class="label text-right">Recipient</div>
+              <div class="value font-black text-gray-900 text-right">{{ party?.fullName }}</div>
+              <div class="subtitle text-right">Primary Contact</div>
+            </div>
+            <div class="card-icon absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-full p-2 shadow-sm border border-indigo-50">
+              <span class="text-lg">📧</span>
+            </div>
           </div>
 
-          <div class="flex gap-4 mb-4">
+          <div class="flex gap-4 mb-6">
             <div class="flex-1">
-              <label class="text-muted block mb-1">To</label>
-              <input class="e-input" type="email" [(ngModel)]="toField">
+              <label class="text-[10px] uppercase font-black text-gray-400 tracking-widest block mb-2">To Address</label>
+              <div class="input-wrapper rounded-xl p-1 bg-gray-50 border border-gray-100 focus-within:border-indigo-500/50 focus-within:ring-4 focus-within:ring-indigo-500/5 transition-all">
+                <input class="modern-input" type="email" [(ngModel)]="toField" placeholder="recipient@example.com">
+              </div>
             </div>
             <div class="flex-1">
-              <label class="text-muted block mb-1">CC</label>
-              <input class="e-input" type="email" [(ngModel)]="ccField">
+              <label class="text-[10px] uppercase font-black text-gray-400 tracking-widest block mb-2">CC (Optional)</label>
+              <div class="input-wrapper rounded-xl p-1 bg-gray-50 border border-gray-100 focus-within:border-indigo-500/50 focus-within:ring-4 focus-within:ring-indigo-500/5 transition-all">
+                <input class="modern-input" type="email" [(ngModel)]="ccField" placeholder="others@example.com">
+              </div>
             </div>
           </div>
 
-          <div class="mb-4">
-            <label class="text-muted block mb-1">Subject</label>
-            <input class="e-input" [(ngModel)]="subject">
+          <div class="mb-6">
+            <label class="text-[10px] uppercase font-black text-gray-400 tracking-widest block mb-2">Subject Line</label>
+            <div class="input-wrapper rounded-xl p-1 bg-gray-50 border border-gray-100 focus-within:border-indigo-500/50 focus-within:ring-4 focus-within:ring-indigo-500/5 transition-all">
+              <input class="modern-input" [(ngModel)]="subject" placeholder="Enter subject...">
+            </div>
           </div>
 
-          <div class="mb-4">
-            <label class="text-muted block mb-1">Body</label>
-            <ejs-richtexteditor #rte [(value)]="body" [toolbarSettings]="toolbarSettings" height="250px"></ejs-richtexteditor>
+          <div class="mb-6">
+            <label class="text-[10px] uppercase font-black text-gray-400 tracking-widest block mb-2">Message Content</label>
+            <div class="rte-wrapper rounded-2xl border border-gray-200 overflow-hidden shadow-sm focus-within:border-indigo-400 transition-all">
+              <ejs-richtexteditor #rte [(value)]="body" [toolbarSettings]="toolbarSettings" height="300px" cssClass="modern-rte"></ejs-richtexteditor>
+            </div>
           </div>
 
           <div class="mb-2">
-            <label class="text-muted block mb-1">Attachments</label>
-            <ejs-uploader #uploader [autoUpload]="false" (selected)="onFileSelect($event)" 
-                          [multiple]="true" [showFileList]="true"
-                          [buttons]="{ browse: 'Add Files...' }"></ejs-uploader>
+            <label class="text-[10px] uppercase font-black text-gray-400 tracking-widest block mb-2">Attachments</label>
+            <div class="uploader-wrapper p-4 border-2 border-dashed border-gray-200 rounded-xl hover:border-indigo-400 transition-colors">
+              <ejs-uploader #uploader [autoUpload]="false" (selected)="onFileSelect($event)" 
+                            [multiple]="true" [showFileList]="true"
+                            [buttons]="{ browse: 'Attach Files' }"></ejs-uploader>
+            </div>
           </div>
         </div>
       </ng-template>
 
       <ng-template #footerTemplate>
-        <button ejs-button [isPrimary]="false" (click)="close()">Cancel</button>
-        <button ejs-button [isPrimary]="true" [disabled]="!toField || !subject || isSending" (click)="send()">
-          <span *ngIf="isSending" class="e-btn-icon e-icons e-spin e-loading"></span>
-          {{ isSending ? 'Sending...' : 'Send Email' }}
-        </button>
+        <div class="p-4 border-t border-gray-50 flex justify-end gap-3 bg-gray-50/50 rounded-b-xl">
+          <button ejs-button [isPrimary]="false" (click)="close()" cssClass="e-flat">Discard</button>
+          <button ejs-button [isPrimary]="true" [disabled]="!toField || !subject || isSending" (click)="send()" class="send-btn">
+            <span *ngIf="isSending" class="e-btn-icon e-icons e-spin e-loading"></span>
+            {{ isSending ? 'Sending...' : 'Send Email' }}
+          </button>
+        </div>
       </ng-template>
     </ejs-dialog>
   `,
   styles: [`
-    .block { display: block; }
-    .mb-1 { margin-bottom: 4px; }
-    .mb-2 { margin-bottom: 8px; }
-    .mb-4 { margin-bottom: 16px; }
-    .regarding-banner { background: #eff6ff; padding: 10px 14px; border-radius: 4px; font-size: 0.9rem; border: 1px solid #bfdbfe; }
-    .regarding-banner .lbl { font-weight: 600; color: #1e40af; margin-right: 8px; }
-    .regarding-banner .val { font-weight: 700; color: #1e3a8a; }
-    .e-input { width: 100%; border-radius: var(--radius-sm); border: 1px solid #cbd5e1; padding: 8px; }
+    :host ::ng-deep .comm-dialog {
+      border-radius: 20px !important;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    }
+    .comm-form-container { background: white; }
+    .context-card {
+      display: flex;
+      position: relative;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+    .email-card { background: linear-gradient(to right, #eef2ff, #f8fafc); border-color: #e0e7ff; }
+    .card-section {
+      flex: 1;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .context-card .label {
+      font-size: 9px;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      color: #94a3b8;
+    }
+    .context-card .value {
+      font-size: 1.1rem;
+      line-height: 1.2;
+    }
+    .context-card .subtitle {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+    }
+    .input-wrapper { background: #f8fafc; }
+    .modern-input {
+      width: 100%;
+      border-radius: 10px;
+      border: none !important;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      background: transparent;
+      outline: none !important;
+      color: #1e1b4b;
+    }
+    .modern-input::placeholder { color: #94a3b8; }
+    .rte-wrapper { background: white; }
+    :host ::ng-deep .modern-rte.e-richtexteditor {
+      border: none !important;
+    }
+    :host ::ng-deep .modern-rte.e-richtexteditor .e-rte-content {
+      border-top: 1px solid #f1f5f9 !important;
+    }
+    .uploader-wrapper { background: white; }
+    .send-btn {
+      padding: 8px 24px !important;
+      border-radius: 12px !important;
+      font-weight: 800 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.05em !important;
+      background: #6366f1 !important;
+      border-color: #6366f1 !important;
+      box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.2) !important;
+    }
   `]
 })
 export class EmailDialogComponent {

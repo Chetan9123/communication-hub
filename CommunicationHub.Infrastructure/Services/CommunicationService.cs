@@ -163,7 +163,8 @@ public class CommunicationService : ICommunicationService
                     AttachmentId = a.AttachmentId,
                     FileUrl = a.FileUrl,
                     MimeType = a.MimeType,
-                    FileSize = a.FileSize
+                    FileSize = a.FileSize,
+                    FileName = a.FileName
                 }).ToList()
             }).ToList()
         };
@@ -209,7 +210,8 @@ public class CommunicationService : ICommunicationService
                     AttachmentId = a.AttachmentId,
                     FileUrl = a.FileUrl,
                     MimeType = a.MimeType,
-                    FileSize = a.FileSize
+                    FileSize = a.FileSize,
+                    FileName = a.FileName
                 }).ToList()
             }).ToList()
         };
@@ -542,9 +544,9 @@ public class CommunicationService : ICommunicationService
         return (assignedCommunicationId, warningMsg);
     }
 
-    public async Task<bool> ProcessIncomingSmsAsync(string fromNumber, string body, string messageSid)
+    public async Task<bool> ProcessIncomingSmsAsync(string fromNumber, string body, string messageSid, List<string>? mediaUrls = null)
     {
-        return await ProcessIncomingGenericAsync(fromNumber, body, messageSid, "SMS", null);
+        return await ProcessIncomingGenericAsync(fromNumber, body, messageSid, "SMS", mediaUrls);
     }
 
     public async Task<bool> ProcessIncomingWhatsAppAsync(string fromNumber, string body, string messageSid, List<string>? mediaUrls = null)
@@ -653,10 +655,11 @@ public class CommunicationService : ICommunicationService
                         var allowedTypes = new[] { 
                             "image/jpeg", "image/png", "image/gif", "image/webp",
                             "video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo",
-                            "audio/mpeg", "audio/wav", "audio/ogg", "audio/aac",
+                            "audio/mpeg", "audio/wav", "audio/ogg", "audio/aac", "audio/amr",
                             "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            "application/zip", "application/x-zip-compressed", "text/plain"
+                            "application/zip", "application/x-zip-compressed", "text/plain",
+                            "application/octet-stream" // Twilio fallback
                         };
 
                         if (!allowedTypes.Contains(contentType) && !contentType.StartsWith("image/") && !contentType.StartsWith("video/"))
@@ -666,12 +669,22 @@ public class CommunicationService : ICommunicationService
                         }
 
                         // 3. Download and Upload to S3
-                        using var stream = await response.Content.ReadAsStreamAsync();
+                        using var memStream = new MemoryStream();
+                        using (var downloadStream = await response.Content.ReadAsStreamAsync())
+                        {
+                            await downloadStream.CopyToAsync(memStream);
+                        }
+                        memStream.Position = 0;
+
+                        // Determine actual file size from downloaded bytes
+                        long actualFileSize = memStream.Length;
+
                         var extension = contentType.Split('/').LastOrDefault() ?? "bin";
                         if (extension == "jpeg") extension = "jpg";
+                        if (extension == "amr") extension = "amr"; // handle audio/amr
                         var fileName = $"{messageSid}_{count}.{extension}";
 
-                        var s3Key = await _s3Service.UploadFileAsync(stream, fileName, contentType, communication.CommunicationId);
+                        var s3Key = await _s3Service.UploadFileAsync(memStream, fileName, contentType, communication.CommunicationId);
 
                         // 4. Save Metadata
                         var attachment = new MessageAttachment
@@ -682,13 +695,13 @@ public class CommunicationService : ICommunicationService
                             S3Key = s3Key,
                             MimeType = contentType,
                             FileType = extension,
-                            FileSize = (int?)(contentLength ?? 0),
+                            FileSize = (int?)actualFileSize,
                             CreatedAt = DateTime.UtcNow
                         };
 
                         _context.MessageAttachments.Add(attachment);
                         count++;
-                        _logger.LogInformation("[Webhook] Attachment saved to S3: {S3Key}", s3Key);
+                        _logger.LogInformation("[Webhook] Attachment saved to S3: {S3Key}, Size: {Size} bytes", s3Key, actualFileSize);
                     }
                     catch (Exception ex)
                     {
@@ -701,6 +714,18 @@ public class CommunicationService : ICommunicationService
             // 5. SignalR Notification
             if (claimId.HasValue)
             {
+                // Retrieve the saved attachment metadata for real-time broadcast
+                var broadcastAttachments = await _context.MessageAttachments
+                    .Where(a => a.CommunicationId == communication.CommunicationId)
+                    .Select(a => new {
+                        attachmentId = a.AttachmentId,
+                        fileName = a.FileName,
+                        fileUrl = a.FileUrl,
+                        mimeType = a.MimeType,
+                        fileSize = a.FileSize
+                    })
+                    .ToListAsync();
+
                 await _hubContext.Clients.Group(claimId.Value.ToString()).SendAsync("ReceiveCommunication", new
                 {
                     mId = communication.CommunicationId,
@@ -709,7 +734,9 @@ public class CommunicationService : ICommunicationService
                     dir = communication.Direction,
                     txt = communication.MessageBody,
                     stat = communication.Status,
-                    ts = communication.ReceivedAt
+                    ts = communication.ReceivedAt,
+                    mode = communication.MessageType,
+                    attachments = broadcastAttachments
                 });
             }
             
@@ -880,6 +907,16 @@ public class CommunicationService : ICommunicationService
         if (string.IsNullOrEmpty(message))
             return string.Empty;
 
-        return message.Length > maxLength ? message.Substring(0, maxLength) + "..." : message;
+        // Strip HTML tags for the preview
+        var plainText = System.Text.RegularExpressions.Regex.Replace(message, "<.*?>", string.Empty);
+        
+        // Replace common HTML entities
+        plainText = plainText.Replace("&nbsp;", " ")
+                           .Replace("&amp;", "&")
+                           .Replace("&lt;", "<")
+                           .Replace("&gt;", ">")
+                           .Trim();
+
+        return plainText.Length > maxLength ? plainText.Substring(0, maxLength) + "..." : plainText;
     }
 }

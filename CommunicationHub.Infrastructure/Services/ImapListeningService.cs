@@ -89,6 +89,7 @@ public class ImapListeningService : BackgroundService
                     using var scope = _serviceProvider.CreateScope();
                     var context = scope.ServiceProvider.GetRequiredService<CommunicationHubDbContext>();
                     var s3Service = scope.ServiceProvider.GetRequiredService<IS3Service>();
+                    var hubContext = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<CommunicationHub.Infrastructure.Hubs.MessagingHub>>();
 
                     foreach (var summary in summaries)
                     {
@@ -160,7 +161,7 @@ public class ImapListeningService : BackgroundService
                         if (isValid)
                         {
                             var fullMessage = await inbox.GetMessageAsync(summary.UniqueId, stoppingToken);
-                            await ProcessMessageAsync(fullMessage, targetParty!, context, s3Service, stoppingToken);
+                            await ProcessMessageAsync(fullMessage, targetParty!, context, s3Service, hubContext, stoppingToken);
                         }
                         // 5. ELSE -> Ignore email
                         else
@@ -208,7 +209,7 @@ public class ImapListeningService : BackgroundService
         _logger.LogInformation("IMAP Listening Service is stopping.");
     }
 
-    private async Task ProcessMessageAsync(MimeMessage message, InvolvedParty party, CommunicationHubDbContext context, IS3Service s3Service, CancellationToken cancellationToken)
+    private async Task ProcessMessageAsync(MimeMessage message, InvolvedParty party, CommunicationHubDbContext context, IS3Service s3Service, Microsoft.AspNetCore.SignalR.IHubContext<CommunicationHub.Infrastructure.Hubs.MessagingHub> hubContext, CancellationToken cancellationToken)
     {
         var subject = message.Subject;
         var textBody = message.TextBody;
@@ -326,6 +327,45 @@ public class ImapListeningService : BackgroundService
         }
 
         _logger.LogInformation("IMAP: Saved new communication from {SenderEmail} for ClaimId={ClaimId}", senderEmail, claimId);
+
+        // Broadcast real-time SignalR notification
+        if (claimId != 0)
+        {
+            try
+            {
+                // Fetch saved attachments for broadcast
+                var broadcastAttachments = await context.MessageAttachments
+                    .Where(a => a.CommunicationId == communication.CommunicationId)
+                    .Select(a => new {
+                        attachmentId = a.AttachmentId,
+                        fileName = a.FileName,
+                        fileUrl = a.FileUrl,
+                        mimeType = a.MimeType,
+                        fileSize = a.FileSize
+                    })
+                    .ToListAsync(cancellationToken);
+
+                object imapPayload = new {
+                    mId = communication.CommunicationId,
+                    id = communication.ClaimId,
+                    pId = communication.PartyId,
+                    dir = communication.Direction,
+                    txt = communication.MessageBody,
+                    stat = communication.Status,
+                    ts = communication.ReceivedAt,
+                    mode = communication.MessageType,
+                    attachments = broadcastAttachments
+                };
+                var claimGroup = hubContext.Clients.Group(claimId.ToString());
+                await Microsoft.AspNetCore.SignalR.ClientProxyExtensions.SendAsync(claimGroup, "ReceiveCommunication", imapPayload, CancellationToken.None);
+
+                _logger.LogInformation("IMAP: SignalR broadcast sent for ClaimId={ClaimId} with {Count} attachment(s).", claimId, broadcastAttachments.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "IMAP: Failed to broadcast SignalR event for ClaimId={ClaimId}", claimId);
+            }
+        }
     }
 
     private int? ExtractClaimIdFromSubject(string? subject)

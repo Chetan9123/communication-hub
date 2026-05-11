@@ -51,7 +51,7 @@ public interface ICommunicationService
     /// Processes an incoming SMS from Twilio.
     /// Matches the sender to an InvolvedParty/Claim or logs as unmatched.
     /// </summary>
-    Task<bool> ProcessIncomingSmsAsync(string fromNumber, string body, string messageSid);
+    Task<bool> ProcessIncomingSmsAsync(string fromNumber, string body, string messageSid, List<string>? mediaUrls = null);
 
     /// <summary>
     /// Processes an incoming WhatsApp message from Twilio.

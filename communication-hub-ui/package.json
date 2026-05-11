@@ -38,6 +38,7 @@
     "@syncfusion/ej2-angular-inputs": "^33.1.47",
     "@syncfusion/ej2-angular-lists": "^33.1.47",
     "@types/jasmine": "^5.1.0",
+    "eslint": "^10.2.1",
     "jasmine-core": "^5.0.0",
     "karma": "^6.4.0",
     "karma-chrome-launcher": "^3.2.0",

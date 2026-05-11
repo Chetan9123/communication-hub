@@ -395,4 +395,22 @@
 .hub-grid {
   flex: 1;
   width: 100% !important;
+
+  ::ng-deep {
+    .e-rowcell {
+      padding: 1rem !important;
+      white-space: normal !important;
+    }
+    .e-gridcontent .e-content {
+      overflow-y: auto !important;
+    }
+  }
 }
+
+.message-bubble {
+  max-width: 100%;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text-main);
+}

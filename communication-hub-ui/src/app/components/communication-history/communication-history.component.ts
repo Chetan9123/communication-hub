@@ -40,17 +40,15 @@ import { AttachmentViewerComponent } from '../attachment-viewer/attachment-viewe
             </div>
 
             <div class="message-content" [class.expanded]="expandedMap[msg.communicationId!]">
-              <p [innerHTML]="msg.messageBody"></p>
+              <div [innerHTML]="msg.messageBody"></div>
             </div>
 
             <button *ngIf="msg.messageBody && msg.messageBody.length > 150" ejs-button [isPrimary]="false" cssClass="e-small e-flat" 
                     (click)="toggleExpand(msg.communicationId!)">
               {{ expandedMap[msg.communicationId!] ? 'Show Less' : 'Read Full Message' }}
             </button>
+            <app-attachment-viewer [attachments]="msg.attachments || []" class="mt-4 block"></app-attachment-viewer>
           </div>
-
-          <!-- Attachment Viewer (replaces old attachment-chip loop) -->
-          <app-attachment-viewer [attachments]="msg.attachments || []"></app-attachment-viewer>
         </div>
       </div>
     </div>

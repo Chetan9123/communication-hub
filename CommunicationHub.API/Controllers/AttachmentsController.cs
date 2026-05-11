@@ -92,33 +92,37 @@ public class AttachmentsController : ControllerBase
 
             if (!string.IsNullOrEmpty(attachment.S3Key))
             {
-                // Generate a fresh pre-signed URL (1 hour), then stream through backend
+                // Generate a fresh pre-signed URL (1 hour)
                 downloadUrl = await _s3Service.GeneratePreSignedUrlAsync(attachment.S3Key, 60);
+
+                var client = new System.Net.Http.HttpClient();
+                var response = await client.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    client.Dispose();
+                    return StatusCode((int)response.StatusCode, "Failed to retrieve file from storage.");
+                }
+
+                var stream = await response.Content.ReadAsStreamAsync();
+                return File(stream, attachment.MimeType ?? "application/octet-stream", attachment.FileName ?? $"attachment_{attachmentId}");
             }
             else if (!string.IsNullOrEmpty(attachment.FileUrl))
             {
-                downloadUrl = attachment.FileUrl;
-            }
-            else
-            {
-                return BadRequest("Attachment is missing storage information.");
-            }
-
-            // Fetch the file from S3 and stream it directly to the response
-            using var httpClient = new System.Net.Http.HttpClient();
-            var response = await httpClient.GetAsync(downloadUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogWarning("S3 download failed with status {Status} for attachment {Id}", response.StatusCode, attachmentId);
-                return StatusCode((int)response.StatusCode, $"Failed to retrieve file from storage: {response.ReasonPhrase}");
+                // Simple stream proxy for external URLs (not protected but for stability)
+                var client = new System.Net.Http.HttpClient();
+                var response = await client.GetAsync(attachment.FileUrl, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
+                if (!response.IsSuccessStatusCode)
+                {
+                    client.Dispose();
+                    return StatusCode((int)response.StatusCode, "Failed to retrieve external file.");
+                }
+                var stream = await response.Content.ReadAsStreamAsync();
+                return File(stream, attachment.MimeType ?? "application/octet-stream", attachment.FileName ?? $"attachment_{attachmentId}");
             }
 
-            var contentType = attachment.MimeType ?? response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
-            var fileName = attachment.FileName ?? $"attachment_{attachmentId}";
-            var stream = await response.Content.ReadAsStreamAsync();
+            return BadRequest("Attachment is missing storage information.");
 
-            return File(stream, contentType, fileName);
         }
         catch (Exception ex)
         {

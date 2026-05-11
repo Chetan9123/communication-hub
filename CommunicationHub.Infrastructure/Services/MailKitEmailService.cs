@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 using CommunicationHub.Application.Interfaces;
 using CommunicationHub.Domain.Entities;
 using CommunicationHub.Infrastructure.Data;
+using CommunicationHub.Infrastructure.Hubs;
 using MailKit.Net.Smtp;
 using MailKit.Security;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +29,8 @@ public class MailKitEmailService : IEmailService
     private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ILogger<MailKitEmailService> _logger;
+    private readonly IS3Service _s3Service;
+    private readonly IHubContext<MessagingHub> _hubContext;
 
     private const int MaxRetries   = 3;
     private const int BaseDelayMs  = 500; // doubles each attempt
@@ -35,12 +39,16 @@ public class MailKitEmailService : IEmailService
         CommunicationHubDbContext context,
         IServiceProvider serviceProvider,
         IConfiguration configuration,
-        ILogger<MailKitEmailService> logger)
+        ILogger<MailKitEmailService> logger,
+        IS3Service s3Service,
+        IHubContext<MessagingHub> hubContext)
     {
-        _context       = context;
+        _context         = context;
         _serviceProvider = serviceProvider;
-        _configuration = configuration;
-        _logger        = logger;
+        _configuration   = configuration;
+        _logger          = logger;
+        _s3Service       = s3Service;
+        _hubContext      = hubContext;
     }
 
     // ── PUBLIC: Send outbound email ────────────────────────────────────────────
@@ -96,6 +104,7 @@ public class MailKitEmailService : IEmailService
         string subject,
         string text,
         string? html,
+        IEnumerable<(string FileName, Stream Data, string ContentType)>? attachments = null,
         CancellationToken cancellationToken = default)
     {
         try
@@ -156,11 +165,82 @@ public class MailKitEmailService : IEmailService
             };
 
             _context.Communications.Add(communication);
+
+            // Process Attachments if any
+            if (attachments != null)
+            {
+                var attachmentList = attachments.ToList();
+                if (attachmentList.Count > 0)
+                {
+                    _logger.LogInformation("Processing {Count} attachments for inbound email.", attachmentList.Count);
+                    foreach (var (fileName, data, contentType) in attachmentList)
+                    {
+                        // Buffer into MemoryStream so we can read Length even from non-seekable streams
+                        using var ms = new MemoryStream();
+                        await data.CopyToAsync(ms, cancellationToken);
+                        ms.Position = 0;
+
+                        var s3Key = await _s3Service.UploadFileAsync(ms, fileName, contentType, communication.CommunicationId);
+                        
+                        var dbAttachment = new MessageAttachment
+                        {
+                            AttachmentId = Guid.NewGuid(),
+                            CommunicationId = communication.CommunicationId,
+                            FileName = fileName,
+                            S3Key = s3Key,
+                            MimeType = contentType,
+                            FileType = Path.GetExtension(fileName).TrimStart('.'),
+                            FileSize = (int)ms.Length,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        
+                        _context.MessageAttachments.Add(dbAttachment);
+                    }
+                }
+            }
+
             await _context.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
-                "Inbound email saved. CommunicationId={Id} ClaimId={ClaimId}",
+                "Inbound email saved with attachments. CommunicationId={Id} ClaimId={ClaimId}",
                 communication.CommunicationId, communication.ClaimId);
+
+            // Broadcast real-time SignalR notification
+            if (finalClaimId.HasValue)
+            {
+                try
+                {
+                    var broadcastAttachments = await _context.MessageAttachments
+                        .Where(a => a.CommunicationId == communication.CommunicationId)
+                        .Select(a => new {
+                            attachmentId = a.AttachmentId,
+                            fileName = a.FileName,
+                            fileUrl = a.FileUrl,
+                            mimeType = a.MimeType,
+                            fileSize = a.FileSize
+                        })
+                        .ToListAsync(cancellationToken);
+
+                    await _hubContext.Clients.Group(finalClaimId.Value.ToString()).SendAsync("ReceiveCommunication", new
+                    {
+                        mId = communication.CommunicationId,
+                        id  = communication.ClaimId,
+                        pId = communication.PartyId,
+                        dir = communication.Direction,
+                        txt = communication.MessageBody,
+                        stat = communication.Status,
+                        ts  = communication.ReceivedAt,
+                        mode = communication.MessageType,
+                        attachments = broadcastAttachments
+                    });
+
+                    _logger.LogInformation("[EmailInbound] SignalR broadcast sent for ClaimId={ClaimId}", finalClaimId.Value);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "[EmailInbound] Failed to broadcast SignalR event");
+                }
+            }
 
             // Trigger Auto-Reply if Adjuster is Inactive (Background task)
             if (finalClaimId.HasValue && party?.PartyId != null)

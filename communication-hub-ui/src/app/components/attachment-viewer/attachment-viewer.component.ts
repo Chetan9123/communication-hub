@@ -81,7 +81,8 @@ export class AttachmentViewerComponent implements OnInit {
     return att.fileName || `Attachment_${att.attachmentId?.substring(0, 8) || 'file'}`;
   }
 
-  public openPreview(att: AttachmentDto, event?: Event): void {
+  public async openPreview(att: AttachmentDto, event?: Event): Promise<void> {
+    const startTime = performance.now();
     if (event) {
       event.stopPropagation();
       event.preventDefault();
@@ -92,12 +93,11 @@ export class AttachmentViewerComponent implements OnInit {
     const fileType = this.getFileType(att.mimeType);
 
     if (fileType === 'other') {
-      // Force direct download for unrecognized types
       this.downloadFile(att);
       return;
     }
 
-    // Set preview model
+    // Set preview model INITIAL state
     this.previewModel = {
       attachment: att,
       type: fileType,
@@ -105,19 +105,31 @@ export class AttachmentViewerComponent implements OnInit {
       error: null
     };
 
-    this.isLoadingUrl = true;
     this.previewDialog.show();
 
-    this.fetchPresignedUrl(att.attachmentId)
-      .then(url => {
-        // Sanitize URL for iframe (PDF) or src
-        this.previewModel.url = this.sanitizer.bypassSecurityTrustResourceUrl(url);
-        this.isLoadingUrl = false;
-      })
-      .catch(() => {
-        this.isLoadingUrl = false;
-        this.previewModel.error = "Could not load preview. The file might be expired or unavailable.";
-      });
+    // Check if we already have a URL (e.g. from ngOnInit images)
+    if (this.attachmentUrls[att.attachmentId]) {
+      console.log(`[AttachmentViewer] Using cached URL for ${att.attachmentId}. Time: ${performance.now() - startTime}ms`);
+      this.previewModel.url = this.attachmentUrls[att.attachmentId];
+      this.isLoadingUrl = false;
+      return;
+    }
+
+    this.isLoadingUrl = true;
+    try {
+      const url = await this.fetchPresignedUrl(att.attachmentId);
+      this.previewModel.url = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+      
+      // Cache it for next time
+      this.attachmentUrls[att.attachmentId] = this.previewModel.url;
+      
+      console.log(`[AttachmentViewer] URL fetched for ${att.attachmentId}. Time: ${performance.now() - startTime}ms`);
+      this.isLoadingUrl = false;
+    } catch (err) {
+      console.error(`[AttachmentViewer] Failed to fetch URL for ${att.attachmentId}:`, err);
+      this.isLoadingUrl = false;
+      this.previewModel.error = "Could not load preview. The file might be expired or unavailable.";
+    }
   }
 
   public downloadFile(att: AttachmentDto, event?: Event): void {

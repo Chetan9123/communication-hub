@@ -51,7 +51,7 @@ public class AutoReplyService : IAutoReplyService
             {
                 _logger.LogWarning("[AutoReply] Aborting: No adjuster assigned to Claim {ClaimId}.", claimId);
                 return;
-            }
+            } 
 
             var adjuster = claim.ClaimAdjuster.Adjuster;
             var party = claim.InvolvedParties.FirstOrDefault(p => p.PartyId == partyId);

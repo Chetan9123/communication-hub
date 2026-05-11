@@ -41,6 +41,7 @@
       <!-- Feed Grid -->
       <div class="table-responsive">
         <ejs-grid #grid [dataSource]="filteredMessages" [allowSorting]="true" [allowFiltering]="true" 
+                  [allowTextWrap]="true" [textWrapSettings]="{ wrapMode: 'Content' }"
                   [filterSettings]="{ type: 'Menu' }" width="100%" cssClass="hub-grid">
           <e-columns>
             <e-column field="timestamp" headerText="Date & Time" width="160">
@@ -89,9 +90,10 @@
             <e-column field="messageBody" headerText="Body" width="350">
               <ng-template #template let-data>
                 <div class="message-bubble bg-white p-4 rounded-xl border border-gray-100 shadow-sm text-sm line-height-relaxed mb-2">
-                  {{ data.messageBody }}
+                  <div [innerHTML]="data.messageBody"></div>
+                  <!-- Fix: Ensure attachments are passed as an array and handle possible nulls -->
+                  <app-attachment-viewer [attachments]="data.attachments || []" class="mt-4 block"></app-attachment-viewer>
                 </div>
-                <app-attachment-viewer [attachments]="data.attachments" class="mt-2 block"></app-attachment-viewer>
               </ng-template>
             </e-column>
           </e-columns>

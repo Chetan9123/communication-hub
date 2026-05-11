@@ -26,33 +26,60 @@ public class SmsWebhookController : ControllerBase
     /// </summary>
     [HttpPost]
     [Consumes("application/x-www-form-urlencoded")]
-    public async Task<IActionResult> ReceiveSms([FromForm] TwilioSmsWebhookRequest request)
+    public async Task<IActionResult> ReceiveSms()
     {
-        _logger.LogInformation("[SmsWebhook] RECEIVED: From={From}, Body={Body}", request.From, request.Body);
-
         try
         {
-            if (string.IsNullOrEmpty(request.From) || string.IsNullOrEmpty(request.Body))
+            if (!Request.HasFormContentType)
             {
-                _logger.LogWarning("[SmsWebhook] Invalid request received. From or Body is missing.");
-                // Still return 200 OK with empty TwiML to avoid Twilio retries for bad data
+                _logger.LogWarning("[SmsWebhook] Received request without form content type.");
                 return Content("<Response></Response>", "text/xml");
             }
 
+            var form = await Request.ReadFormAsync();
+            string from = form["From"].ToString() ?? string.Empty;
+            string body = form["Body"].ToString() ?? string.Empty;
+            string messageSid = form["MessageSid"].ToString() ?? form["SmsSid"].ToString() ?? "NO_SID";
+            string numMediaStr = form["NumMedia"].ToString() ?? "0";
+            
+            _logger.LogInformation("[SmsWebhook] RECEIVED: From={From}, Body={Body}, SID={Sid}, NumMedia={NumMedia}", from, body, messageSid, numMediaStr);
+
+            // Only reject if 'From' is missing. Allow empty body — Twilio sends Body=""
+            // for image-only MMS messages (media with no text).
+            if (string.IsNullOrEmpty(from))
+            {
+                _logger.LogWarning("[SmsWebhook] Invalid request: 'From' is missing.");
+                return Content("<Response></Response>", "text/xml");
+            }
+
+            // Extract media URLs safely
+            var mediaUrls = new List<string>();
+            if (int.TryParse(form["NumMedia"], out int numMedia))
+            {
+                for (int i = 0; i < numMedia; i++)
+                {
+                    string? mediaUrl = form[$"MediaUrl{i}"];
+                    if (!string.IsNullOrEmpty(mediaUrl))
+                    {
+                        mediaUrls.Add(mediaUrl);
+                    }
+                }
+            }
+
             // Process the incoming message via CommunicationService
-            // We pass the SmsSid or MessageSid as the unique provider reference
             var result = await _communicationService.ProcessIncomingSmsAsync(
-                request.From, 
-                request.Body, 
-                request.MessageSid ?? request.SmsSid ?? string.Empty);
+                from, 
+                body, 
+                messageSid,
+                mediaUrls);
 
             if (result)
             {
-                _logger.LogInformation("[SmsWebhook] Successfully processed message from {From}", request.From);
+                _logger.LogInformation("[SmsWebhook] Successfully processed message from {From}", from);
             }
             else
             {
-                _logger.LogError("[SmsWebhook] Failed to process message from {From}", request.From);
+                _logger.LogError("[SmsWebhook] Failed to process message from {From}", from);
             }
 
             // Return empty TwiML to acknowledge receipt
@@ -60,7 +87,7 @@ public class SmsWebhookController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[SmsWebhook] Exception occurred while receiving SMS from {From}", request.From);
+            _logger.LogError(ex, "[SmsWebhook] Exception occurred while receiving SMS");
             
             // Even on error, we return 200 OK with empty TwiML to prevent Twilio from 
             // retrying the same failing request repeatedly.
