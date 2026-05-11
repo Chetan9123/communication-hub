@@ -104,3 +104,12 @@ populate-test-data.ps1
 test-cols.cs
 IMPLEMENTATION_CHECKLIST.md
 TESTING_UI_FLOW.md
+test.jpeg
+log.txt
+build_errors.txt
+build_output.txt
+build_errors.txt
+backendF.drawio.png
+addColumn.txt
+GetRegion.cs
+.gitignore
